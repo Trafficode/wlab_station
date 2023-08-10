@@ -21,7 +21,10 @@
 #define WLAB_SAMPLE_BUFFER_SIZE \
     (8 + ((60 * CONFIG_WLAB_PUB_PERIOD) / CONFIG_WLAB_MEASURE_PERIOD))
 
-typedef enum wlab_sensor { WLAB_SENSOR_DHT22 } wlab_sensor_t;
+typedef enum wlab_sensor {
+    WLAB_SENSOR_NONE = 0,
+    WLAB_SENSOR_DHT22,
+} wlab_sensor_t;
 
 typedef struct {
     int32_t _min;
