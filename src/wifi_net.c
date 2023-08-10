@@ -6,6 +6,8 @@
 #include "wifi_net.h"
 
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/net_event.h>
@@ -35,6 +37,11 @@ K_WORK_DEFINE(ReconnectWork, reconnect_work_handler);
 K_TIMER_DEFINE(ReconnectTimer, reconnect_timer_handler, NULL);
 
 static struct wifi_connect_req_params WifiInit = {0};
+static char MacHexStr[13];
+
+void wifi_net_mac_string(char mac_buffer[13]) {
+    memcpy(mac_buffer, MacHexStr, sizeof(MacHexStr));
+}
 
 void wifi_net_init(char *ssid, char *passwd) {
     net_mgmt_init_event_callback(
@@ -62,6 +69,14 @@ void wifi_net_init(char *ssid, char *passwd) {
     WifiInit.mfp = WIFI_MFP_OPTIONAL;
 
     LOG_INF("Connecting to SSID: %s", WifiInit.ssid);
+
+    uint8_t mac_address[6];
+    struct net_linkaddr *addr = net_if_get_link_addr(iface);
+    memcpy(mac_address, addr->addr, sizeof(mac_address));
+    sprintf(MacHexStr, "%02X%02X%02X%02X%02X%02X", mac_address[0],
+            mac_address[1], mac_address[2], mac_address[3], mac_address[4],
+            mac_address[5]);
+    LOG_INF("WIFI_MAC: %s", MacHexStr);
 
     if (net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &WifiInit,
                  sizeof(struct wifi_connect_req_params))) {

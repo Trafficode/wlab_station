@@ -49,6 +49,14 @@ void mqtt_worker_disconnect(void);
  */
 void mqtt_worker_connection_attempt(void);
 
+/**
+ * @brief Wait for mqtt connection given time in millis
+ *
+ * @param timeout_ms time to wait for mqtt connection
+ * @return int32_t 0 success, errno code otherwise
+ */
+int32_t mqtt_worker_connection_wait(uint32_t timeout_ms);
+
 #endif /* MQTT_WORKER_H_ */
 /* ---------------------------------------------------------------------------
  * end of file

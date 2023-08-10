@@ -5,6 +5,7 @@
  * --------------------------------------------------------------------------*/
 #include "mqtt_worker.h"
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -80,8 +81,13 @@ K_THREAD_DEFINE(SubsTid, SUBSCRIBE_STACK_SIZE, subscribe_proc, NULL, NULL, NULL,
                 SUBSCRIBE_PRIORITY, 0, 0);
 
 K_SEM_DEFINE(PublishAck, 0, 1);
+K_SEM_DEFINE(ConectedAck, 0, 1);
 K_MSGQ_DEFINE(SubsQueue, sizeof(subs_data_t *), 4, 4);
 K_MEM_SLAB_DEFINE_STATIC(SubsQueueSlab, sizeof(subs_data_t), 4, 4);
+
+int32_t mqtt_worker_connection_wait(uint32_t timeout_ms) {
+    return k_sem_take(&ConectedAck, K_MSEC(timeout_ms));
+}
 
 void mqtt_worker_disconnect(void) {
     DisconnectReqExternal = true;
@@ -362,6 +368,7 @@ static int32_t input_handle(void) {
 
         if (DisconnectReqExternal) {
             mqtt_disconnect(client);
+            k_sem_take(&ConectedAck, K_NO_WAIT);
             Connected = false;
             res = -1;
             goto failed_done;
@@ -440,12 +447,14 @@ static void mqtt_evt_handler(struct mqtt_client *const client,
                 LOG_ERR("MQTT connect failed %d", evt->result);
             } else {
                 Connected = true;
+                k_sem_give(&ConectedAck);
             }
             break;
         }
         case MQTT_EVT_DISCONNECT: {
             LOG_INF("MQTT client disconnected %d", evt->result);
             Connected = false;
+            k_sem_take(&ConectedAck, K_NO_WAIT);
             break;
         }
         case MQTT_EVT_PUBLISH: {

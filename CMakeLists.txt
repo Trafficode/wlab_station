@@ -11,4 +11,5 @@ target_sources(app PRIVATE
     src/main.c
     src/wifi_net.c
     src/mqtt_worker.c
+    src/wlab.c
 )

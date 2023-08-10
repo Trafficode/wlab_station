@@ -1,2 +1,3 @@
 build/
 inc/config_wifi.h
+inc/config_wlab.h

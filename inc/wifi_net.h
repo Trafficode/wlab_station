@@ -6,7 +6,20 @@
 #ifndef WIFI_NET_H_
 #define WIFI_NET_H_
 
+/**
+ * @brief
+ *
+ * @param ssid
+ * @param passwd
+ */
 void wifi_net_init(char *ssid, char *passwd);
+
+/**
+ * @brief
+ *
+ * @param mac_buffer
+ */
+void wifi_net_mac_string(char mac_buffer[13]);
 
 #endif /* WIFI_NET_H_ */
 /* ---------------------------------------------------------------------------
