@@ -5,13 +5,17 @@
  * --------------------------------------------------------------------------*/
 #include "wlab.h"
 
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
 
 #include "config_wlab.h"
+#include "dht2x.h"
 #include "mqtt_worker.h"
 #include "wifi_net.h"
 
@@ -37,10 +41,13 @@ const char *DHTJsonDataTemplate =
 static int wlab_dht_publish_sample(buffer_t *temp, buffer_t *rh);
 
 static buffer_t TempBuffer, RhBuffer;
+static wlab_sensor_t SensorType = WLAB_SENSOR_NONE;
 
 void wlab_init(const wlab_sensor_t sensor_type) {
+    SensorType = sensor_type;
     switch (sensor_type) {
         case WLAB_SENSOR_DHT22: {
+            dht2x_init();
             wlab_buffer_init(&TempBuffer);
             wlab_buffer_init(&RhBuffer);
             break;
@@ -52,31 +59,29 @@ void wlab_init(const wlab_sensor_t sensor_type) {
 }
 
 void wlab_process(int64_t timestamp_secs) {
-    int32_t rc = 0;
-    time_t now = 0;
-    struct tm timeinfo;
     static uint32_t last_minutes = 0;
     static int64_t last_secs = 0;
-    int16_t temp = 0, rh = 0;
-    int32_t temp_avg = 0, rh_avg = 0;
 
     if (timestamp_secs - last_secs < CONFIG_WLAB_MEASURE_PERIOD) {
         goto process_done;
     }
 
+    last_secs = timestamp_secs;
+
+    int16_t temp = 0, rh = 0;
+    int32_t temp_avg = 0, rh_avg = 0;
+    int32_t rc = 0;
+    time_t now = 0;
+    struct tm timeinfo = {0};
+
     now = timestamp_secs;
     gmtime_r(&now, &timeinfo);
 
-    // if (!dht_read(&dht21, &temp, &rh)) {
-    //     LOG_INF("%s, temp:%d rh:%d", __FUNCTION__, temp, rh);
-    //     if (500 < temp || 1000 < rh) {
-    //         LOG_ERR("%s, Failed to validate data", __FUNCTION__);
-    //         continue;
-    //     }
-    // } else {
-    //     LOG_ERR("%s, DHT21 failed", __FUNCTION__);
-    //     continue;
-    // }
+    if (0 != dht2x_read(&temp, &rh)) {
+        LOG_ERR("Sensor fetch failed");
+        goto process_done;
+    }
+    LOG_INF("Temp %d, RH %d", temp, rh);
 
     if ((0x00 == timeinfo.tm_min % CONFIG_WLAB_PUB_PERIOD) &&
         (timeinfo.tm_min != last_minutes)) {
@@ -168,30 +173,29 @@ static void wlab_buffer_init(buffer_t *buffer) {
     buffer->sample_ts = 0;
 }
 
-/* wlab_buffer_commit
- * :param threshold
- * when that value exceed average then skip sample
- * when first sample will bad, then no next sample will be added so finally
- * sample count wont be enought
+/**
+ * @brief When val exceeds MIN or MAX value more than threshold then skip this
+ * measuremnt. It was neccessary to add when pt100 and maxXXXX is a sensor.
  */
 static bool wlab_buffer_commit(buffer_t *buffer, int32_t val, uint32_t ts,
                                uint32_t threshold) {
+    bool rc = false;
     if ((buffer->_max != INT32_MIN) && ((val - threshold) > buffer->_max)) {
-        LOG_ERR("%s, Value %d max exceed threshold\n", __FUNCTION__, val);
-        return (false);
+        LOG_ERR("%s, Value %d max exceed threshold", __FUNCTION__, val);
+        goto failed_done;
     }
 
     if ((buffer->_min != INT32_MAX) && ((val + threshold) < buffer->_min)) {
-        LOG_ERR("%s, Value %d min exceed threshold\n", __FUNCTION__, val);
-        return (false);
+        LOG_ERR("%s, Value %d min exceed threshold", __FUNCTION__, val);
+        goto failed_done;
     }
 
     if (WLAB_SAMPLE_BUFFER_SIZE > buffer->cnt) {
         buffer->sample_buff[buffer->cnt] = (int16_t)val;
         buffer->sample_buff_ts[buffer->cnt] = ts;
     } else {
-        LOG_ERR("%s, buffer length exceed\n", __FUNCTION__);
-        return (false);
+        LOG_ERR("%s, buffer length exceed", __FUNCTION__);
+        goto failed_done;
     }
 
     if (INT32_MAX == buffer->sample_ts_val) {
@@ -212,7 +216,9 @@ static bool wlab_buffer_commit(buffer_t *buffer, int32_t val, uint32_t ts,
 
     buffer->buff += val;
     buffer->cnt++;
-    return (true);
+
+failed_done:
+    return (rc);
 }
 
 /* ---------------------------------------------------------------------------

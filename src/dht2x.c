@@ -5,6 +5,7 @@
  * --------------------------------------------------------------------------*/
 #include "dht2x.h"
 
+#include <errno.h>
 #include <stdint.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
@@ -66,7 +67,7 @@ void dht2x_init(void) {
     gpio_pin_configure_dt(&DHT2X, GPIO_OUTPUT_INACTIVE);
 }
 
-int32_t dht2x_read(void) {
+int32_t dht2x_read(int16_t *temp, int16_t *rh) {
     int32_t rc = 0;
     LOG_INF("%s", __FUNCTION__);
 
@@ -91,6 +92,7 @@ int32_t dht2x_read(void) {
 
     if (0 != k_sem_take(&DhtReadDone, K_MSEC(30))) {
         LOG_ERR("Read failed, PulseCnt %d", PulseCnt);
+        rc = -EIO;
         goto failed_done;
     } else {
         LOG_INF("Read done, PulseCnt %d, LastElapsed %u, ReadData %016llX",
@@ -100,16 +102,25 @@ int32_t dht2x_read(void) {
     uint8_t *buf = (uint8_t *)&ReadData;
 
     /* verify checksum */
-    if (((buf[4] + buf[3] + buf[2] + buf[1]) & 0xFF) != buf[0]) {
+    if (((buf[4] + buf[3] + buf[2] + buf[1]) & 0xFF) != buf[0] || 0 == buf[0]) {
         LOG_ERR("Invalid checksum in fetched sample");
+        rc = -ENOTSUP;
         goto failed_done;
     } else {
         LOG_INF("Checksum valid");
     }
 
+    *rh = (ReadData >> 24) & 0xFFFF;
+    *temp = (ReadData >> 8) & 0xFFFF;
+
+    if (*temp & (1 << 15)) {
+        *temp &= ~(1 << 15);
+        *temp = -*temp;
+    }
+
 failed_done:
     gpio_pin_configure_dt(&DHT2X, GPIO_OUTPUT_INACTIVE);
-    return (0);
+    return (rc);
 }
 
 static uint32_t dht2x_us_now(void) {

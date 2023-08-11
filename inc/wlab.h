@@ -16,7 +16,7 @@
 /* Sometimes max return weird value not fitted to the other if this value
  * will be more than WLAB_EXT2AVG_MAX then skip */
 #define WLAB_EXT2AVG_MAX       (32)
-#define WLAB_MIN_SAMPLES_COUNT (16)
+#define WLAB_MIN_SAMPLES_COUNT (8)
 
 #define WLAB_SAMPLE_BUFFER_SIZE \
     (8 + ((60 * CONFIG_WLAB_PUB_PERIOD) / CONFIG_WLAB_MEASURE_PERIOD))

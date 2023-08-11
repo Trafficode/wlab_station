@@ -236,7 +236,7 @@ static void mqtt_proc(void *arg1, void *arg2, void *arg3) {
                 LOG_INF("CONNECTED");
                 int32_t res = input_handle();
                 if (0 != res) {
-                    StateMachine = DISCONNECTED;
+                    StateMachine = DNS_RESOLVE;
                 }
                 break;
             }
@@ -452,7 +452,7 @@ static void mqtt_evt_handler(struct mqtt_client *const client,
             break;
         }
         case MQTT_EVT_DISCONNECT: {
-            LOG_INF("MQTT client disconnected %d", evt->result);
+            LOG_ERR("MQTT client disconnected %d", evt->result);
             Connected = false;
             k_sem_take(&ConectedAck, K_NO_WAIT);
             break;

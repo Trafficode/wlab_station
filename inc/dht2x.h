@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 void dht2x_init(void);
-int32_t dht2x_read(void);
+int32_t dht2x_read(int16_t *temp, int16_t *rh);
 
 #endif /* DHT2X_H_ */
 /* ---------------------------------------------------------------------------
