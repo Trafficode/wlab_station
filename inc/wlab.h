@@ -41,13 +41,24 @@ typedef struct {
 } buffer_t;
 
 /**
- * @brief
+ * @brief Initialize weatherlab service with provided sensor type
  *
  * @param sensor_type
  */
 void wlab_init(wlab_sensor_t sensor_type);
 
+/**
+ * @brief Send authorization to wheatherlab service
+ *
+ * @return int32_t 0 - success, errno code otherwise
+ */
 int32_t wlab_authorize(void);
+
+/**
+ * @brief Do sensor measurement and publish to weatherlab if needed
+ *
+ * @param timestamp_secs Actual epoch time in seconds
+ */
 void wlab_process(int64_t timestamp_secs);
 
 #endif /* WLAB_H_ */

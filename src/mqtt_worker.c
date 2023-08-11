@@ -98,13 +98,14 @@ void mqtt_worker_connection_attempt(void) {
 }
 
 int32_t mqtt_worker_publish_qos1(const char *topic, const char *fmt, ...) {
-    int32_t res = -1;
+    int32_t res = 0;
 
     va_list args;
     va_start(args, fmt);
 
     if (!Connected || DisconnectReqExternal) {
         LOG_WRN("Cannot publish, client not connected");
+        res = -ENETUNREACH;
         goto failed_done;
     }
 

@@ -7,17 +7,18 @@
 #define WIFI_NET_H_
 
 /**
- * @brief
+ * @brief Initialize wifi network, everything is proceeded in background, do
+ * reconnection if needed
  *
- * @param ssid
- * @param passwd
+ * @param ssid Network ssid string
+ * @param passwd Network passwd string, provide NULL if network is open
  */
 void wifi_net_init(char *ssid, char *passwd);
 
 /**
- * @brief
+ * @brief Get wifi interface MAC address
  *
- * @param mac_buffer
+ * @param mac_buffer buffer for mac address, will be ended with \0 sign
  */
 void wifi_net_mac_string(char mac_buffer[13]);
 

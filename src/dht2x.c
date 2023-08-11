@@ -42,6 +42,7 @@ void gpio_callback(const struct device *dev, struct gpio_callback *cb,
             /* bit 0 */
             ReadData = ReadData << 1;
         } else if ((LastElapsed >= 120) && (LastElapsed < 150)) {
+            /* bit 1 */
             ReadData = (ReadData << 1) | 1;
         } else {
             /* bit timing failed */
