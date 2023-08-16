@@ -29,19 +29,26 @@ static volatile uint32_t LastElapsed = 0;
 
 void gpio_callback(const struct device *dev, struct gpio_callback *cb,
                    uint32_t pin) {
-    if (k_sem_count_get(&DhtReadDone)) {
-        return; /* read already failed */
+    if (42 == PulseCnt) {
+        return; /* DHT21 = AM2301 sends 64 bit, rest of them are 0 */
     }
 
     uint32_t us_now = dht2x_us_now();
     LastElapsed = us_now - PulseStartUs;
-    if (PulseCnt < 2) {
+    if (0 == PulseCnt) {
+        if (LastElapsed > 100) {
+            PulseCnt += 2;
+            /* Sometime we are not able to catch first falling edge, if this
+             * situation occure then second elapsed is ~180us. If first edge
+             * catch it schould be < 30us */
+        }
+    } else if (1 == PulseCnt) {
         PulseCnt++;
     } else {
-        if (LastElapsed < 120) {
+        if (LastElapsed < 110) {
             /* bit 0 */
             ReadData = ReadData << 1;
-        } else if ((LastElapsed >= 120) && (LastElapsed < 150)) {
+        } else if (LastElapsed >= 110) {
             /* bit 1 */
             ReadData = (ReadData << 1) | 1;
         } else {
@@ -83,6 +90,7 @@ int32_t dht2x_read(int16_t *temp, int16_t *rh) {
 
     k_sleep(K_MSEC(18));
 
+    k_sched_lock();
     gpio_pin_set_dt(&DHT2X, false);
     PulseStartUs = dht2x_us_now();
 
@@ -90,13 +98,15 @@ int32_t dht2x_read(int16_t *temp, int16_t *rh) {
     gpio_pin_interrupt_configure_dt(&DHT2X, GPIO_INT_EDGE_FALLING);
     gpio_init_callback(&IrqCb, gpio_callback, BIT(DHT2X.pin));
     gpio_add_callback_dt(&DHT2X, &IrqCb);
+    k_sched_unlock();
 
-    if (0 != k_sem_take(&DhtReadDone, K_MSEC(30))) {
+    int32_t res = k_sem_take(&DhtReadDone, K_MSEC(50));
+    if (0 != res) {
         LOG_ERR("Read failed, PulseCnt %d", PulseCnt);
         rc = -EIO;
-        goto failed_done;
+        goto read_done;
     } else {
-        LOG_INF("Read done, PulseCnt %d, LastElapsed %u, ReadData %016llX",
+        LOG_INF("Read done, PulseCnt %d, LastElapsed %u, ReadData %010llX",
                 PulseCnt, LastElapsed, ReadData);
     }
 
@@ -106,7 +116,7 @@ int32_t dht2x_read(int16_t *temp, int16_t *rh) {
     if (((buf[4] + buf[3] + buf[2] + buf[1]) & 0xFF) != buf[0] || 0 == buf[0]) {
         LOG_ERR("Invalid checksum in fetched sample");
         rc = -ENOTSUP;
-        goto failed_done;
+        goto read_done;
     } else {
         LOG_INF("Checksum valid");
     }
@@ -119,7 +129,7 @@ int32_t dht2x_read(int16_t *temp, int16_t *rh) {
         *temp = -*temp;
     }
 
-failed_done:
+read_done:
     gpio_pin_configure_dt(&DHT2X, GPIO_OUTPUT_INACTIVE);
     return (rc);
 }
