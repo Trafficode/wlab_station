@@ -18,9 +18,6 @@
 #define WLAB_EXT2AVG_MAX       (32)
 #define WLAB_MIN_SAMPLES_COUNT (8)
 
-#define WLAB_SAMPLE_BUFFER_SIZE \
-    (8 + ((60 * CONFIG_WLAB_PUB_PERIOD) / CONFIG_WLAB_MEASURE_PERIOD))
-
 typedef enum wlab_sensor {
     WLAB_SENSOR_NONE = 0,
     WLAB_SENSOR_DHT22,
@@ -35,9 +32,6 @@ typedef struct {
     int32_t cnt;
     uint32_t sample_ts;
     int32_t sample_ts_val;
-
-    int16_t sample_buff[WLAB_SAMPLE_BUFFER_SIZE];
-    uint32_t sample_buff_ts[WLAB_SAMPLE_BUFFER_SIZE];
 } buffer_t;
 
 /**

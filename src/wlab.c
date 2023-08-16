@@ -190,14 +190,6 @@ static bool wlab_buffer_commit(buffer_t *buffer, int32_t val, uint32_t ts,
         goto failed_done;
     }
 
-    if (WLAB_SAMPLE_BUFFER_SIZE > buffer->cnt) {
-        buffer->sample_buff[buffer->cnt] = (int16_t)val;
-        buffer->sample_buff_ts[buffer->cnt] = ts;
-    } else {
-        LOG_ERR("%s, buffer length exceed", __FUNCTION__);
-        goto failed_done;
-    }
-
     if (INT32_MAX == buffer->sample_ts_val) {
         /* Mark buffer timestamp as first sample time */
         buffer->sample_ts = ts - (ts % (60 * CONFIG_WLAB_PUB_PERIOD));
