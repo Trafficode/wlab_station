@@ -85,6 +85,12 @@ K_SEM_DEFINE(ConectedAck, 0, 1);
 K_MSGQ_DEFINE(SubsQueue, sizeof(subs_data_t *), 4, 4);
 K_MEM_SLAB_DEFINE_STATIC(SubsQueueSlab, sizeof(subs_data_t), 4, 4);
 
+static int64_t LastKeepaliveResp = 0;
+
+int64_t mqtt_worker_last_keepalive_resp(void) {
+    return (LastKeepaliveResp);
+}
+
 int32_t mqtt_worker_connection_wait(uint32_t timeout_ms) {
     return k_sem_take(&ConectedAck, K_MSEC(timeout_ms));
 }
@@ -377,7 +383,7 @@ static int32_t input_handle(void) {
     } else {
         LOG_INF("Keepalive...");
         mqtt_live(client);
-        next_alive = uptime_ms + (60 * MSEC_PER_SEC);
+        next_alive = uptime_ms + (MQTT_WORKER_PING_TIMEOUT * MSEC_PER_SEC);
     }
 
     res = 0; /* success done */
@@ -448,6 +454,7 @@ static void mqtt_evt_handler(struct mqtt_client *const client,
                 LOG_ERR("MQTT connect failed %d", evt->result);
             } else {
                 Connected = true;
+                LastKeepaliveResp = k_uptime_get();
                 k_sem_give(&ConectedAck);
             }
             break;
@@ -564,6 +571,7 @@ static void mqtt_evt_handler(struct mqtt_client *const client,
         }
         case MQTT_EVT_PINGRESP: {
             LOG_INF("MQTT_EVT_PINGRESP");
+            LastKeepaliveResp = k_uptime_get();
             break;
         }
         default: {

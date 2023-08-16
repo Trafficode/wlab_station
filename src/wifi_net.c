@@ -38,6 +38,7 @@ K_TIMER_DEFINE(ReconnectTimer, reconnect_timer_handler, NULL);
 
 static struct wifi_connect_req_params WifiInit = {0};
 static char MacHexStr[13];
+static bool FirstConnection = true;
 
 void wifi_net_mac_string(char mac_buffer[13]) {
     memcpy(mac_buffer, MacHexStr, sizeof(MacHexStr));
@@ -107,7 +108,9 @@ static void handle_wifi_connect_result(struct net_mgmt_event_callback *cb) {
     } else {
         LOG_INF("Connected");
         wifi_status();
-        mqtt_worker_connection_attempt();
+        if (false == FirstConnection) {
+            mqtt_worker_connection_attempt();
+        }
     }
 }
 
@@ -143,6 +146,10 @@ static void handle_ipv4_result(struct net_if *iface) {
                               sizeof(buf)));
         LOG_INF("Router: %s", net_addr_ntop(AF_INET, &iface->config.ip.ipv4->gw,
                                             buf, sizeof(buf)));
+        if (true == FirstConnection) {
+            mqtt_worker_connection_attempt();
+            FirstConnection = false;
+        }
     }
 }
 
