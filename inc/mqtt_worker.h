@@ -13,7 +13,8 @@
 #define MQTT_WORKER_MAX_TOPIC_LEN       (128)
 #define MQTT_WORKER_MAX_PAYLOAD_LEN     (256)
 #define MQTT_WORKER_MAX_PUBLISH_LEN     (512)
-#define MQTT_WORKER_PUBLISH_ACK_TIMEOUT (4) /* seconds */
+#define MQTT_WORKER_PUBLISH_ACK_TIMEOUT (4)  /* seconds */
+#define MQTT_WORKER_PING_TIMEOUT        (60) /* secs*/
 
 typedef void (*subs_cb_t)(char *topic, uint16_t topic_len, char *payload,
                           uint16_t payload_len);
@@ -56,6 +57,13 @@ void mqtt_worker_connection_attempt(void);
  * @return int32_t 0 success, errno code otherwise
  */
 int32_t mqtt_worker_connection_wait(uint32_t timeout_ms);
+
+/**
+ * @brief Function to return last keepalive response
+ *
+ * @return int64_t System millis timestamp
+ */
+int64_t mqtt_worker_last_keepalive_resp(void);
 
 #endif /* MQTT_WORKER_H_ */
 /* ---------------------------------------------------------------------------
