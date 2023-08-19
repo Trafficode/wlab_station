@@ -18,11 +18,6 @@
 #define WLAB_EXT2AVG_MAX       (32)
 #define WLAB_MIN_SAMPLES_COUNT (8)
 
-typedef enum wlab_sensor {
-    WLAB_SENSOR_NONE = 0,
-    WLAB_SENSOR_DHT22,
-} wlab_sensor_t;
-
 typedef struct {
     int32_t _min;
     int32_t _max;
@@ -37,9 +32,8 @@ typedef struct {
 /**
  * @brief Initialize weatherlab service with provided sensor type
  *
- * @param sensor_type
  */
-void wlab_init(wlab_sensor_t sensor_type);
+void wlab_init(void);
 
 /**
  * @brief Send authorization to wheatherlab service

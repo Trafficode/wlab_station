@@ -12,12 +12,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(DHTX, LOG_LEVEL_DBG);
-
-static const struct gpio_dt_spec DHT2X =
-    GPIO_DT_SPEC_GET(DT_NODELABEL(dht_pin), gpios);
-
-static uint32_t dht2x_us_now(void);
+LOG_MODULE_REGISTER(DHTx, LOG_LEVEL_DBG);
 
 struct gpio_callback IrqCb;
 K_SEM_DEFINE(DhtReadDone, 0, 1);
@@ -27,12 +22,17 @@ static volatile uint32_t PulseCnt = 0;
 static volatile uint64_t ReadData = 0;
 static volatile uint32_t LastElapsed = 0;
 
-void gpio_callback(const struct device *dev, struct gpio_callback *cb,
-                   uint32_t pin) {
-    if (42 == PulseCnt) {
-        return; /* DHT21 = AM2301 sends 64 bit, rest of them are 0 */
-    }
+static uint32_t dht2x_us_now(void) {
+    uint64_t cyc = k_cycle_get_32();
+    uint64_t cyc_per_us =
+        ((uint32_t)sys_clock_hw_cycles_per_sec()) / (uint32_t)USEC_PER_SEC;
+    return (cyc / cyc_per_us);
+}
 
+static void gpio_callback(const struct device *dev, struct gpio_callback *cb,
+                          uint32_t pin) {
+    /* DHT21 = AM2301 sends 64 bit, rest of them are 0 */
+    struct gpio_dt_spec *dhtx_spec = (struct gpio_dt_spec *)dev->data;
     uint32_t us_now = dht2x_us_now();
     LastElapsed = us_now - PulseStartUs;
     if (0 == PulseCnt) {
@@ -45,14 +45,12 @@ void gpio_callback(const struct device *dev, struct gpio_callback *cb,
     } else if (1 == PulseCnt) {
         PulseCnt++;
     } else {
-        if (LastElapsed < 110) {
-            /* bit 0 */
+        if (LastElapsed <= 110) { /* bit 0 */
             ReadData = ReadData << 1;
-        } else if (LastElapsed >= 110) {
-            /* bit 1 */
+        } else if (LastElapsed > 110) { /* bit 1 */
             ReadData = (ReadData << 1) | 1;
-        } else {
-            /* bit timing failed */
+        } else { /* bit timing failed */
+            gpio_pin_interrupt_configure(dev, pin, GPIO_INT_DISABLE);
             k_sem_give(&DhtReadDone);
         }
         PulseCnt++;
@@ -60,22 +58,25 @@ void gpio_callback(const struct device *dev, struct gpio_callback *cb,
 
     if (42 == PulseCnt) {
         /* read success */
+        gpio_pin_interrupt_configure(dev, pin, GPIO_INT_DISABLE);
         k_sem_give(&DhtReadDone);
     }
 
     PulseStartUs = us_now;
 }
 
-void dht2x_init(void) {
-    if (!device_is_ready(DHT2X.port)) {
+int32_t dht2x_init(const struct gpio_dt_spec *dhtx_spec) {
+    if (!device_is_ready(dhtx_spec->port)) {
         LOG_ERR("Dht2x gpio not ready");
-        return;
+        return -EIO;
     }
 
-    gpio_pin_configure_dt(&DHT2X, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(dhtx_spec, GPIO_OUTPUT_INACTIVE);
+    return (0);
 }
 
-int32_t dht2x_read(int16_t *temp, int16_t *rh) {
+int32_t dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
+                   int16_t *rh) {
     int32_t rc = 0;
     LOG_INF("%s", __FUNCTION__);
 
@@ -83,21 +84,21 @@ int32_t dht2x_read(int16_t *temp, int16_t *rh) {
     PulseCnt = 0;
     ReadData = 0;
 
-    gpio_pin_configure_dt(&DHT2X, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(dhtx_spec, GPIO_OUTPUT_INACTIVE);
 
     /* assert to send start signal */
-    gpio_pin_set_dt(&DHT2X, true);
+    gpio_pin_set_dt(dhtx_spec, true);
 
     k_sleep(K_MSEC(18));
 
     k_sched_lock();
-    gpio_pin_set_dt(&DHT2X, false);
+    gpio_pin_set_dt(dhtx_spec, false);
     PulseStartUs = dht2x_us_now();
 
-    gpio_pin_configure_dt(&DHT2X, GPIO_INPUT);
-    gpio_pin_interrupt_configure_dt(&DHT2X, GPIO_INT_EDGE_FALLING);
-    gpio_init_callback(&IrqCb, gpio_callback, BIT(DHT2X.pin));
-    gpio_add_callback_dt(&DHT2X, &IrqCb);
+    gpio_pin_configure_dt(dhtx_spec, GPIO_INPUT);
+    gpio_pin_interrupt_configure_dt(dhtx_spec, GPIO_INT_EDGE_FALLING);
+    gpio_init_callback(&IrqCb, gpio_callback, BIT(dhtx_spec->pin));
+    gpio_add_callback_dt(dhtx_spec, &IrqCb);
     k_sched_unlock();
 
     int32_t res = k_sem_take(&DhtReadDone, K_MSEC(50));
@@ -130,15 +131,8 @@ int32_t dht2x_read(int16_t *temp, int16_t *rh) {
     }
 
 read_done:
-    gpio_pin_configure_dt(&DHT2X, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(dhtx_spec, GPIO_OUTPUT_INACTIVE);
     return (rc);
-}
-
-static uint32_t dht2x_us_now(void) {
-    uint64_t cyc = k_cycle_get_32();
-    uint64_t cyc_per_us =
-        ((uint32_t)sys_clock_hw_cycles_per_sec()) / (uint32_t)USEC_PER_SEC;
-    return (cyc / cyc_per_us);
 }
 
 /* ---------------------------------------------------------------------------

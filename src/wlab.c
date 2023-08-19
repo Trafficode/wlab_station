@@ -40,22 +40,15 @@ const char *DHTJsonDataTemplate =
 
 static int wlab_dht_publish_sample(buffer_t *temp, buffer_t *rh);
 
-static buffer_t TempBuffer, RhBuffer;
-static wlab_sensor_t SensorType = WLAB_SENSOR_NONE;
+static const struct gpio_dt_spec DHTx =
+    GPIO_DT_SPEC_GET(DT_NODELABEL(dht_pin), gpios);
 
-void wlab_init(const wlab_sensor_t sensor_type) {
-    SensorType = sensor_type;
-    switch (sensor_type) {
-        case WLAB_SENSOR_DHT22: {
-            dht2x_init();
-            wlab_buffer_init(&TempBuffer);
-            wlab_buffer_init(&RhBuffer);
-            break;
-        }
-        default: {
-            break;
-        }
-    }
+static buffer_t TempBuffer, RhBuffer;
+
+void wlab_init(void) {
+    dht2x_init(&DHTx);
+    wlab_buffer_init(&TempBuffer);
+    wlab_buffer_init(&RhBuffer);
 }
 
 void wlab_process(int64_t timestamp_secs) {
@@ -77,7 +70,7 @@ void wlab_process(int64_t timestamp_secs) {
     now = timestamp_secs;
     gmtime_r(&now, &timeinfo);
 
-    if (0 != dht2x_read(&temp, &rh)) {
+    if (0 != dht2x_read(&DHTx, &temp, &rh)) {
         LOG_ERR("Sensor fetch failed");
         goto process_done;
     }
@@ -180,14 +173,16 @@ static void wlab_buffer_init(buffer_t *buffer) {
 static bool wlab_buffer_commit(buffer_t *buffer, int32_t val, uint32_t ts,
                                uint32_t threshold) {
     bool rc = false;
-    if ((buffer->_max != INT32_MIN) && ((val - threshold) > buffer->_max)) {
-        LOG_ERR("%s, Value %d max exceed threshold", __FUNCTION__, val);
-        goto failed_done;
-    }
+    if (buffer->cnt > 4) {
+        if ((buffer->_max != INT32_MIN) && ((val - threshold) > buffer->_max)) {
+            LOG_ERR("%s, Value %d max exceed threshold", __FUNCTION__, val);
+            goto failed_done;
+        }
 
-    if ((buffer->_min != INT32_MAX) && ((val + threshold) < buffer->_min)) {
-        LOG_ERR("%s, Value %d min exceed threshold", __FUNCTION__, val);
-        goto failed_done;
+        if ((buffer->_min != INT32_MAX) && ((val + threshold) < buffer->_min)) {
+            LOG_ERR("%s, Value %d min exceed threshold", __FUNCTION__, val);
+            goto failed_done;
+        }
     }
 
     if (INT32_MAX == buffer->sample_ts_val) {
