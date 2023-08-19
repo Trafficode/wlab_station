@@ -20,6 +20,7 @@
 #include "dht2x.h"
 #include "mqtt_worker.h"
 #include "nvs_defs.h"
+#include "version.h"
 #include "wifi_net.h"
 #include "wlab.h"
 
@@ -87,6 +88,8 @@ int main(void) {
         while (true)
             ;
     }
+    LOG_INF("FIRMWARE_VERSION %s", FIRMWARE_VERSION);
+    LOG_INF("ZEPHYR_VERSION %s", ZEPHYR_VERSION);
 
     struct flash_pages_info info = {0};
     Fs.flash_device = NVS_PARTITION_DEVICE;
