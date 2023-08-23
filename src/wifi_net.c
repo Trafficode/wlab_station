@@ -130,6 +130,7 @@ static void handle_wifi_disconnect_result(struct net_mgmt_event_callback *cb) {
 static void handle_ipv4_result(struct net_if *iface) {
     int32_t i = 0;
 
+    LOG_INF("handle_ipv4_result");
     for (i = 0; i < NET_IF_MAX_IPV4_ADDR; i++) {
         char buf[NET_IPV4_ADDR_LEN];
 

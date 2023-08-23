@@ -14,6 +14,7 @@
 #include <zephyr/net/mqtt.h>
 #include <zephyr/net/sntp.h>
 #include <zephyr/storage/flash_map.h>
+#include <zephyr/sys/reboot.h>
 
 #include "config_wifi.h"
 #include "config_wlab.h"
@@ -152,10 +153,9 @@ int main(void) {
 
     wifi_net_init(WIFI_SSID, WIFI_PASS);
 
-    if (0 != mqtt_worker_connection_wait(8 * 1000)) {
-        /* system reboot by wdg */
-        while (true)
-            ;
+    if (0 != mqtt_worker_connection_wait(32 * 1000)) {
+        /* system reboot */
+        sys_reboot(SYS_REBOOT_COLD);
     }
 
     wlab_init();
@@ -177,9 +177,8 @@ int main(void) {
         sntp_sync_attempts++;
         wdt_feed(Wdt, wdt_channel_id);
         if (8 == sntp_sync_attempts) {
-            /* system reboot by wdg */
-            while (true)
-                ;
+            /* system reboot */
+            sys_reboot(SYS_REBOOT_COLD);
         }
     }
     LOG_INF("rtc sync success");
@@ -193,7 +192,7 @@ int main(void) {
 
         wlab_process(ts_now);
 
-        if (ts_now - last_rtc_sync_ts > 1 * 60) {
+        if (ts_now - last_rtc_sync_ts > 4 * 60) {
             rtc_time_sync();
             last_rtc_sync_ts = ts_now;
         }
@@ -201,9 +200,10 @@ int main(void) {
         gpio_pin_toggle_dt(&InfoLed);
 
         int64_t last_mqtt_alive = mqtt_worker_last_keepalive_resp();
-        int64_t mqtt_alive_timeout = 8 * (1000 * MQTT_WORKER_PING_TIMEOUT);
+        /* wait 2 hours for mqtt connection, samples has to be stored in nvs */
+        int64_t mqtt_alive_timeout = 2 * 60 * (1000 * MQTT_WORKER_PING_TIMEOUT);
         if (k_uptime_get() > last_mqtt_alive + mqtt_alive_timeout) {
-            k_sleep(K_FOREVER);
+            sys_reboot(SYS_REBOOT_COLD);
         } else {
             wdt_feed(Wdt, wdt_channel_id);
         }
