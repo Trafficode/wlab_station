@@ -31,8 +31,7 @@ static uint32_t dht2x_us_now(void) {
 
 static void gpio_callback(const struct device *dev, struct gpio_callback *cb,
                           uint32_t pin) {
-    /* DHT21 = AM2301 sends 64 bit, rest of them are 0 */
-    struct gpio_dt_spec *dhtx_spec = (struct gpio_dt_spec *)dev->data;
+    /* DHT21 = AM2301 sends 64 bit, only first 40bis include data */
     uint32_t us_now = dht2x_us_now();
     LastElapsed = us_now - PulseStartUs;
     if (0 == PulseCnt) {
@@ -40,7 +39,7 @@ static void gpio_callback(const struct device *dev, struct gpio_callback *cb,
             PulseCnt += 2;
             /* Sometime we are not able to catch first falling edge, if this
              * situation occure then second elapsed is ~180us. If first edge
-             * catch it schould be < 30us */
+             * catch it should be < 30us */
         }
     } else if (1 == PulseCnt) {
         PulseCnt++;

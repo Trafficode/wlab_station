@@ -36,12 +36,10 @@ int main(void) {
             SYS_KERNEL_VER_MAJOR(ver), SYS_KERNEL_VER_MINOR(ver),
             SYS_KERNEL_VER_PATCHLEVEL(ver));
 
-    nvs_data_init();
     gpio_pin_configure_dt(&InfoLed, GPIO_OUTPUT_ACTIVE);
-
+    nvs_data_init();
     mqtt_worker_init(CONFIG_WLAB_MQTT_BROKER, CONFIG_WLAB_MQTT_BROKER_PORT,
                      NULL, NULL);
-
     wifi_net_init(WIFI_SSID, WIFI_PASS);
 
     if (0 != mqtt_worker_connection_wait(32 * 1000)) {
@@ -66,9 +64,9 @@ int main(void) {
         int64_t mqtt_alive_timeout = 2 * 60 * (1000 * MQTT_WORKER_PING_TIMEOUT);
         if (k_uptime_get() > last_mqtt_alive + mqtt_alive_timeout) {
             sys_reboot(SYS_REBOOT_COLD);
-        } else {
-            wdg_feed();
         }
+
+        wdg_feed();
     }
 }
 
