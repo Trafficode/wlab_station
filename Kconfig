@@ -1,0 +1,13 @@
+source "Kconfig.zephyr"
+
+config TIMESTAMP_UPDATE_PERIOD_SEC
+	int "Period between sntp synchronization"
+	default 60
+	help
+		Period between sntp synchronization in sconds
+
+config WDG_TIMEOUT_SEC
+	int "Watchdoog timeout"
+	default 30
+	help
+		When this time expire and watchdog will not be feeded - cpu restart

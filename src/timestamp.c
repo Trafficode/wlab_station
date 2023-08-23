@@ -41,8 +41,8 @@ int64_t timestamp_get(void) {
 }
 
 void timestamp_update(int64_t period_secs) {
-    int64_t actual_uptime = k_uptime_get();
-    if (UptimeSyncMs + period_secs < actual_uptime) {
+    int64_t actual_uptime_ms = k_uptime_get();
+    if (UptimeSyncMs + (1000 * period_secs) < actual_uptime_ms) {
         timestamp_sync();
     }
 }
@@ -55,6 +55,7 @@ static int timestamp_sync(void) {
     if (0 == ret) {
         SntpSyncSec = (int64_t)sntp_time.seconds;
         UptimeSyncMs = k_uptime_get();
+        LOG_INF("Acquire SNTP success");
     } else {
         LOG_ERR("Failed to acquire SNTP, code %d", ret);
     }

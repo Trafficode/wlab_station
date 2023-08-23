@@ -28,7 +28,7 @@ static const struct gpio_dt_spec InfoLed =
     GPIO_DT_SPEC_GET(DT_NODELABEL(info_led), gpios);
 
 int main(void) {
-    wdg_init(30); /* 30 secs of watchdog timeout */
+    wdg_init(CONFIG_WDG_TIMEOUT_SEC);
 
     uint32_t ver = sys_kernel_version_get();
     LOG_INF("Board: %s", CONFIG_BOARD);
@@ -38,6 +38,7 @@ int main(void) {
 
     gpio_pin_configure_dt(&InfoLed, GPIO_OUTPUT_ACTIVE);
     nvs_data_init();
+
     mqtt_worker_init(CONFIG_WLAB_MQTT_BROKER, CONFIG_WLAB_MQTT_BROKER_PORT,
                      NULL, NULL);
     wifi_net_init(WIFI_SSID, WIFI_PASS);
@@ -57,7 +58,7 @@ int main(void) {
 
         ts_now = timestamp_get();
         wlab_process(ts_now);
-        timestamp_update(60);
+        timestamp_update(CONFIG_TIMESTAMP_UPDATE_PERIOD_SEC);
 
         int64_t last_mqtt_alive = mqtt_worker_last_keepalive_resp();
         /* wait 2 hours for mqtt connection, samples has to be stored in nvs */
