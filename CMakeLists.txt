@@ -13,4 +13,7 @@ target_sources(app PRIVATE
     src/mqtt_worker.c
     src/wlab.c
     src/dht2x.c
+    src/wdg.c
+    src/nvs_data.c
+    src/timestamp.c
 )

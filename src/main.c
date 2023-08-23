@@ -5,23 +5,20 @@
  * --------------------------------------------------------------------------*/
 #include <stdint.h>
 #include <zephyr/device.h>
-#include <zephyr/drivers/flash.h>
 #include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/watchdog.h>
-#include <zephyr/fs/nvs.h>
 #include <zephyr/kernel.h>
+#include <zephyr/kernel_version.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/net/mqtt.h>
-#include <zephyr/net/sntp.h>
-#include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/reboot.h>
 
 #include "config_wifi.h"
 #include "config_wlab.h"
 #include "dht2x.h"
 #include "mqtt_worker.h"
-#include "nvs_defs.h"
+#include "nvs_data.h"
+#include "timestamp.h"
 #include "version.h"
+#include "wdg.h"
 #include "wifi_net.h"
 #include "wlab.h"
 
@@ -30,123 +27,17 @@ LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_DBG);
 static const struct gpio_dt_spec InfoLed =
     GPIO_DT_SPEC_GET(DT_NODELABEL(info_led), gpios);
 
-static const struct device *const Wdt = DEVICE_DT_GET(DT_ALIAS(watchdog0));
-
-static int64_t UptimeSyncMs = 0;
-static int64_t SntpSyncSec = 0;
-static struct nvs_fs Fs = {0};
-
-static int64_t rtc_time_get(void) {
-    int64_t sec_elapsed = (k_uptime_get() - UptimeSyncMs) / 1000;
-    return (SntpSyncSec + sec_elapsed);
-}
-
-static int32_t rtc_time_sync(void) {
-    int32_t rc = 0;
-    struct sntp_time sntp_time = {0};
-
-    rc = sntp_simple("0.pl.pool.ntp.org", 2000, &sntp_time);
-    if (0 == rc) {
-        SntpSyncSec = (int64_t)sntp_time.seconds;
-        UptimeSyncMs = k_uptime_get();
-    } else {
-        LOG_ERR("Failed to acquire SNTP, code %d", rc);
-    }
-
-    return (rc);
-}
-
 int main(void) {
-    LOG_INF("WLAB station board: %s", CONFIG_BOARD);
-    LOG_INF("sys_clock_hw_cycles_per_sec = %u", sys_clock_hw_cycles_per_sec());
+    wdg_init(30); /* 30 secs of watchdog timeout */
 
-    if (!device_is_ready(Wdt)) {
-        LOG_ERR("%s: device not ready", Wdt->name);
-        while (true)
-            ;
-    }
+    uint32_t ver = sys_kernel_version_get();
+    LOG_INF("Board: %s", CONFIG_BOARD);
+    LOG_INF("Firmware: %s Zephyr: %u.%u.%u", FIRMWARE_VERSION,
+            SYS_KERNEL_VER_MAJOR(ver), SYS_KERNEL_VER_MINOR(ver),
+            SYS_KERNEL_VER_PATCHLEVEL(ver));
 
-    struct wdt_timeout_cfg wdt_config = {
-        /* Reset SoC when watchdog timer expires. */
-        .flags = WDT_FLAG_RESET_SOC,
-
-        /* Expire watchdog after max window */
-        .window.min = 0,         /* for esp32 it has to be 0 */
-        .window.max = 32 * 1000, /* millis */
-        .callback = NULL,
-    };
-
-    int32_t wdt_channel_id = wdt_install_timeout(Wdt, &wdt_config);
-    if (wdt_channel_id < 0) {
-        LOG_ERR("Watchdog install error");
-        while (true)
-            ;
-    }
-
-    int32_t ret = wdt_setup(Wdt, WDT_OPT_PAUSE_HALTED_BY_DBG);
-    if (ret < 0) {
-        LOG_ERR("Watchdog setup error");
-        while (true)
-            ;
-    }
-    LOG_INF("FIRMWARE_VERSION %s", FIRMWARE_VERSION);
-    LOG_INF("ZEPHYR_VERSION %s", ZEPHYR_VERSION);
-
-    struct flash_pages_info info = {0};
-    Fs.flash_device = NVS_PARTITION_DEVICE;
-    if (!device_is_ready(Fs.flash_device)) {
-        LOG_ERR("Flash device %s is not ready", Fs.flash_device->name);
-        while (true)
-            ;
-    }
-    Fs.offset = NVS_PARTITION_OFFSET;
-    ret = flash_get_page_info_by_offs(Fs.flash_device, Fs.offset, &info);
-    if (ret) {
-        LOG_ERR("Unable to get page info err %d", ret);
-        while (true)
-            ;
-    }
-    LOG_INF("NVS sector size %u part size %u", info.size, NVS_PARTITION_SIZE);
-
-    Fs.sector_size = info.size;
-    Fs.sector_count = NVS_PARTITION_SIZE / info.size;
-
-    ret = nvs_mount(&Fs);
-    if (0 != ret) {
-        LOG_ERR("Flash Init failed err %d", ret);
-        while (true)
-            ;
-    }
-
-    uint32_t boot_counter = UINT32_C(0);
-    size_t area_len = sizeof(boot_counter);
-    ret = nvs_read(&Fs, NVS_ID_BOOT_COUNT, &boot_counter, area_len);
-    if (ret > 0) { /* item was found, show it */
-        LOG_INF("boot counter: %d", boot_counter);
-    } else { /* item was not found, add it */
-        LOG_INF("No boot counter found, adding it at id %d", NVS_ID_BOOT_COUNT);
-    }
-    boot_counter++;
-
-    if (area_len ==
-        nvs_write(&Fs, NVS_ID_BOOT_COUNT, &boot_counter, area_len)) {
-        LOG_INF("Save boot counter %d succ", boot_counter);
-    } else {
-        LOG_ERR("Save boot counter %d err", boot_counter);
-    }
-
-    ret = gpio_pin_configure_dt(&InfoLed, GPIO_OUTPUT_ACTIVE);
-    if (0 != ret) {
-        LOG_ERR("gpio configuration failed");
-        while (true)
-            ;
-    }
-
-    if (!device_is_ready(InfoLed.port)) {
-        LOG_ERR("GPIO0 not ready");
-        while (true)
-            ;
-    }
+    nvs_data_init();
+    gpio_pin_configure_dt(&InfoLed, GPIO_OUTPUT_ACTIVE);
 
     mqtt_worker_init(CONFIG_WLAB_MQTT_BROKER, CONFIG_WLAB_MQTT_BROKER_PORT,
                      NULL, NULL);
@@ -158,12 +49,13 @@ int main(void) {
         sys_reboot(SYS_REBOOT_COLD);
     }
 
-    wlab_init();
+    timestamp_init();
 
+    wlab_init();
     int32_t auth_attempts = 0;
     while (0 != wlab_authorize()) {
         auth_attempts++;
-        wdt_feed(Wdt, wdt_channel_id);
+        wdg_feed();
         if (8 == auth_attempts) {
             /* system reboot by wdg */
             while (true)
@@ -172,32 +64,14 @@ int main(void) {
     }
     LOG_INF("wlab authorize success");
 
-    int32_t sntp_sync_attempts = 0;
-    while (0 != rtc_time_sync()) {
-        sntp_sync_attempts++;
-        wdt_feed(Wdt, wdt_channel_id);
-        if (8 == sntp_sync_attempts) {
-            /* system reboot */
-            sys_reboot(SYS_REBOOT_COLD);
-        }
-    }
-    LOG_INF("rtc sync success");
-
-    int64_t last_rtc_sync_ts = rtc_time_get();
     int64_t ts_now = 0;
     for (;;) {
         k_sleep(K_MSEC(100));
-
-        ts_now = rtc_time_get();
-
-        wlab_process(ts_now);
-
-        if (ts_now - last_rtc_sync_ts > 4 * 60) {
-            rtc_time_sync();
-            last_rtc_sync_ts = ts_now;
-        }
-
         gpio_pin_toggle_dt(&InfoLed);
+
+        ts_now = timestamp_get();
+        wlab_process(ts_now);
+        timestamp_update(60);
 
         int64_t last_mqtt_alive = mqtt_worker_last_keepalive_resp();
         /* wait 2 hours for mqtt connection, samples has to be stored in nvs */
@@ -205,7 +79,7 @@ int main(void) {
         if (k_uptime_get() > last_mqtt_alive + mqtt_alive_timeout) {
             sys_reboot(SYS_REBOOT_COLD);
         } else {
-            wdt_feed(Wdt, wdt_channel_id);
+            wdg_feed();
         }
     }
 }

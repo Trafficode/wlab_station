@@ -1,20 +1,26 @@
 /* ---------------------------------------------------------------------------
- *  nvs
+ *  wlab_station
  * ---------------------------------------------------------------------------
- *  Name: nvs_defs.h
+ *  Name: wdg.h
  * --------------------------------------------------------------------------*/
-#ifndef NVS_DEFS_H_
-#define NVS_DEFS_H_
+#ifndef WDG_H_
+#define WDG_H_
 
-#define NVS_PARTITION        storage_partition
-#define NVS_PARTITION_DEVICE FIXED_PARTITION_DEVICE(NVS_PARTITION)
-#define NVS_PARTITION_OFFSET FIXED_PARTITION_OFFSET(NVS_PARTITION)
-#define NVS_PARTITION_SIZE   FIXED_PARTITION_SIZE(NVS_PARTITION)
+#include <stdint.h>
 
-#define NVS_ID_BOOT_COUNT (1)
-#define NVS_ID_TIMESTAMP  (2)
+/**
+ * @brief Feed watchdog.
+ *
+ */
+void wdg_feed(void);
 
-#endif /* NVS_DEFS_H_ */
+/**
+ * @brief Initialise watchdog with timeout passed in seconds.
+ *
+ */
+void wdg_init(uint32_t timeout_sec);
+
+#endif /* WDG_H_ */
 /* ---------------------------------------------------------------------------
  * end of file
  * --------------------------------------------------------------------------*/
