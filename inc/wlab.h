@@ -36,13 +36,6 @@ typedef struct {
 void wlab_init(void);
 
 /**
- * @brief Send authorization to wheatherlab service
- *
- * @return int32_t 0 - success, errno code otherwise
- */
-int32_t wlab_authorize(void);
-
-/**
  * @brief Do sensor measurement and publish to weatherlab if needed
  *
  * @param timestamp_secs Actual epoch time in seconds

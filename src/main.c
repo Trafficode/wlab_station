@@ -50,19 +50,7 @@ int main(void) {
     }
 
     timestamp_init();
-
     wlab_init();
-    int32_t auth_attempts = 0;
-    while (0 != wlab_authorize()) {
-        auth_attempts++;
-        wdg_feed();
-        if (8 == auth_attempts) {
-            /* system reboot by wdg */
-            while (true)
-                ;
-        }
-    }
-    LOG_INF("wlab authorize success");
 
     int64_t ts_now = 0;
     for (;;) {

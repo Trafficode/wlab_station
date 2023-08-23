@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- *  wlab
+ *  wlab_station
  * ---------------------------------------------------------------------------
  *  Name: wlab.c
  * --------------------------------------------------------------------------*/
@@ -11,16 +11,18 @@
 #include <stdlib.h>
 #include <time.h>
 #include <zephyr/device.h>
-#include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/reboot.h>
 
 #include "config_wlab.h"
 #include "dht2x.h"
 #include "mqtt_worker.h"
+#include "wdg.h"
 #include "wifi_net.h"
 
 LOG_MODULE_REGISTER(WLAB, LOG_LEVEL_DBG);
 
+static int wlab_authorize(void);
 static bool wlab_buffer_commit(buffer_t *buffer, int32_t val, uint32_t ts,
                                uint32_t threshold);
 static void wlab_buffer_init(buffer_t *buffer);
@@ -43,12 +45,23 @@ static int wlab_dht_publish_sample(buffer_t *temp, buffer_t *rh);
 static const struct gpio_dt_spec DHTx =
     GPIO_DT_SPEC_GET(DT_NODELABEL(dht_pin), gpios);
 
-static buffer_t TempBuffer, RhBuffer;
+static buffer_t TempBuffer = {0}, RhBuffer = {0};
 
 void wlab_init(void) {
     dht2x_init(&DHTx);
     wlab_buffer_init(&TempBuffer);
     wlab_buffer_init(&RhBuffer);
+
+    int32_t auth_attempts = 0;
+    while (0 != wlab_authorize()) {
+        auth_attempts++;
+        wdg_feed();
+        if (8 == auth_attempts) {
+            /* system reboot */
+            sys_reboot(SYS_REBOOT_COLD);
+        }
+    }
+    LOG_INF("wlab authorize success");
 }
 
 void wlab_process(int64_t timestamp_secs) {
@@ -134,16 +147,16 @@ static int32_t wlab_dht_publish_sample(buffer_t *temp, buffer_t *rh) {
     return (rc);
 }
 
-int32_t wlab_authorize(void) {
-    int32_t rc = 0;
+int wlab_authorize(void) {
+    int ret = 0;
     char mac_addr[13];
 
     wifi_net_mac_string(mac_addr);
-    rc = mqtt_worker_publish_qos1(
+    ret = mqtt_worker_publish_qos1(
         CONFIG_WLAB_AUTH_TOPIC, AuthTemplate, CONFIG_WLAB_TIMEZONE,
         CONFIG_WLAB_LATITIUDE, CONFIG_WLAB_LONGITUDE, WLAB_TEMP_SERIE,
         WLAB_HUMIDITY_SERIE, CONFIG_WLAB_NAME, CONFIG_WLAB_DHT_DESC, mac_addr);
-    return (rc);
+    return (ret);
 }
 
 static void wlab_itostrf(char *dest, int32_t signed_int) {
