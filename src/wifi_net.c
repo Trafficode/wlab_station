@@ -13,8 +13,9 @@
 #include <zephyr/net/net_event.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/wifi_mgmt.h>
+#include <zephyr/sys/reboot.h>
 
-#include "mqtt_worker.h"
+#include "wdg.h"
 
 LOG_MODULE_REGISTER(WIFI, LOG_LEVEL_DBG);
 
@@ -38,7 +39,14 @@ K_TIMER_DEFINE(ReconnectTimer, reconnect_timer_handler, NULL);
 
 static struct wifi_connect_req_params WifiInit = {0};
 static char MacHexStr[13];
-static bool FirstConnection = true;
+
+K_SEM_DEFINE(FirstConnSem, 0, 1);
+
+static void (*DiscoCb)(int32_t) = NULL;
+
+void net_on_disconnect_reqister(void (*disco_cb)(int32_t reason)) {
+    DiscoCb = disco_cb;
+}
 
 void wifi_net_mac_string(char mac_buffer[13]) {
     memcpy(mac_buffer, MacHexStr, sizeof(MacHexStr));
@@ -83,6 +91,21 @@ void wifi_net_init(char *ssid, char *passwd) {
                  sizeof(struct wifi_connect_req_params))) {
         LOG_ERR("WiFi Connection Request Failed");
     }
+
+    int32_t sec_cnt = 0;
+    for (sec_cnt = 0; sec_cnt < CONFIG_WIFI_FIRST_CONN_TIMEOUT_SEC; sec_cnt++) {
+        wdg_feed();
+        if (0 == k_sem_take(&FirstConnSem, K_SECONDS(1))) {
+            break;
+        }
+    }
+
+    if (CONFIG_WIFI_FIRST_CONN_TIMEOUT_SEC == sec_cnt) {
+        LOG_ERR("Wifi connection timeout");
+        sys_reboot(SYS_REBOOT_COLD);
+    }
+
+    LOG_INF("Wifi connected");
 }
 
 static void reconnect_timer_handler(struct k_timer *dummy) {
@@ -108,9 +131,6 @@ static void handle_wifi_connect_result(struct net_mgmt_event_callback *cb) {
     } else {
         LOG_INF("Connected");
         wifi_status();
-        if (false == FirstConnection) {
-            mqtt_worker_connection_attempt();
-        }
     }
 }
 
@@ -122,7 +142,11 @@ static void handle_wifi_disconnect_result(struct net_mgmt_event_callback *cb) {
     } else {
         LOG_INF("Disconnected");
     }
-    mqtt_worker_disconnect();
+
+    if (NULL != DiscoCb) {
+        DiscoCb(status->status);
+    }
+
     /* one shot timer */
     k_timer_start(&ReconnectTimer, K_SECONDS(4), K_NO_WAIT);
 }
@@ -147,10 +171,7 @@ static void handle_ipv4_result(struct net_if *iface) {
                               sizeof(buf)));
         LOG_INF("Router: %s", net_addr_ntop(AF_INET, &iface->config.ip.ipv4->gw,
                                             buf, sizeof(buf)));
-        if (true == FirstConnection) {
-            mqtt_worker_connection_attempt();
-            FirstConnection = false;
-        }
+        k_sem_give(&FirstConnSem);
     }
 }
 

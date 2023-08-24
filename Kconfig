@@ -3,11 +3,19 @@ source "Kconfig.zephyr"
 config TIMESTAMP_UPDATE_PERIOD_SEC
 	int "Period between sntp synchronization"
 	default 60
-	help
-		Period between sntp synchronization in sconds
 
 config WDG_TIMEOUT_SEC
 	int "Watchdoog timeout"
 	default 30
-	help
-		When this time expire and watchdog will not be feeded - cpu restart
+
+config WIFI_FIRST_CONN_TIMEOUT_SEC
+	int "Timeout for first wifi connection"
+	default 20
+
+config MQTT_FIRST_CONN_TIMEOUT_SEC
+	int "Timeout for first mqtt connection"
+	default 20
+
+config MQTT_KEEPALIVE_TIMEOUT_MINS
+	int "The longest time with no keepalive response from server"
+	default 10

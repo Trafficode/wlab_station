@@ -22,6 +22,13 @@ void wifi_net_init(char *ssid, char *passwd);
  */
 void wifi_net_mac_string(char mac_buffer[13]);
 
+/**
+ * @brief Register callback to notify network disconnected event.
+ *
+ * @param disco_cb Cb to register.
+ */
+void net_on_disconnect_reqister(void (*disco_cb)(int reason));
+
 #endif /* WIFI_NET_H_ */
 /* ---------------------------------------------------------------------------
  * end of file

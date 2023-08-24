@@ -40,9 +40,10 @@ int64_t timestamp_get(void) {
     return (SntpSyncSec + sec_elapsed);
 }
 
-void timestamp_update(int64_t period_secs) {
+void timestamp_update(void) {
     int64_t actual_uptime_ms = k_uptime_get();
-    if (UptimeSyncMs + (1000 * period_secs) < actual_uptime_ms) {
+    if (UptimeSyncMs + (1000 * CONFIG_TIMESTAMP_UPDATE_PERIOD_SEC) <
+        actual_uptime_ms) {
         timestamp_sync();
     }
 }

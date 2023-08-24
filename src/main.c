@@ -38,16 +38,9 @@ int main(void) {
 
     gpio_pin_configure_dt(&InfoLed, GPIO_OUTPUT_ACTIVE);
     nvs_data_init();
-
+    wifi_net_init(WIFI_SSID, WIFI_PASS);
     mqtt_worker_init(CONFIG_WLAB_MQTT_BROKER, CONFIG_WLAB_MQTT_BROKER_PORT,
                      NULL, NULL);
-    wifi_net_init(WIFI_SSID, WIFI_PASS);
-
-    if (0 != mqtt_worker_connection_wait(32 * 1000)) {
-        /* system reboot */
-        sys_reboot(SYS_REBOOT_COLD);
-    }
-
     timestamp_init();
     wlab_init();
 
@@ -58,15 +51,8 @@ int main(void) {
 
         ts_now = timestamp_get();
         wlab_process(ts_now);
-        timestamp_update(CONFIG_TIMESTAMP_UPDATE_PERIOD_SEC);
-
-        int64_t last_mqtt_alive = mqtt_worker_last_keepalive_resp();
-        /* wait 2 hours for mqtt connection, samples has to be stored in nvs */
-        int64_t mqtt_alive_timeout = 2 * 60 * (1000 * MQTT_WORKER_PING_TIMEOUT);
-        if (k_uptime_get() > last_mqtt_alive + mqtt_alive_timeout) {
-            sys_reboot(SYS_REBOOT_COLD);
-        }
-
+        timestamp_update();
+        mqtt_worker_keepalive_test();
         wdg_feed();
     }
 }

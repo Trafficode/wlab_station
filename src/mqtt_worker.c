@@ -14,6 +14,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/mqtt.h>
 #include <zephyr/net/socketutils.h>
+#include <zephyr/sys/reboot.h>
+
+#include "wdg.h"
 
 LOG_MODULE_REGISTER(MQTT, LOG_LEVEL_DBG);
 
@@ -34,6 +37,8 @@ typedef enum worker_state {
 
 static void mqtt_evt_handler(struct mqtt_client *const client,
                              const struct mqtt_evt *evt);
+static void mqtt_worker_disconnect(int32_t reason);
+
 static int32_t wait_for_input(int32_t timeout);
 static int32_t dns_resolve(void);
 static int32_t connect_to_broker(void);
@@ -80,27 +85,28 @@ K_THREAD_DEFINE(MqttNetTid, MQTT_NET_STACK_SIZE, mqtt_proc, NULL, NULL, NULL,
 K_THREAD_DEFINE(SubsTid, SUBSCRIBE_STACK_SIZE, subscribe_proc, NULL, NULL, NULL,
                 SUBSCRIBE_PRIORITY, 0, 0);
 
-K_SEM_DEFINE(PublishAck, 0, 1);
-K_SEM_DEFINE(ConectedAck, 0, 1);
+K_SEM_DEFINE(PublishAckSem, 0, 1);
+K_SEM_DEFINE(ConectedAckSem, 0, 1);
+K_SEM_DEFINE(WorkerProcStartSem, 0, 1);
 K_MSGQ_DEFINE(SubsQueue, sizeof(subs_data_t *), 4, 4);
 K_MEM_SLAB_DEFINE_STATIC(SubsQueueSlab, sizeof(subs_data_t), 4, 4);
 
 static int64_t LastKeepaliveResp = 0;
 
-int64_t mqtt_worker_last_keepalive_resp(void) {
-    return (LastKeepaliveResp);
-}
+/**
+ * @brief This function has to be delivered by network layer(wifi, modem) to
+ * notify mqtt worker about disconnection event
+ *
+ * @param disco_cb
+ */
+extern void net_on_disconnect_reqister(void (*disco_cb)(int reason));
 
-int32_t mqtt_worker_connection_wait(uint32_t timeout_ms) {
-    return k_sem_take(&ConectedAck, K_MSEC(timeout_ms));
-}
-
-void mqtt_worker_disconnect(void) {
-    DisconnectReqExternal = true;
-}
-
-void mqtt_worker_connection_attempt(void) {
-    StateMachine = DNS_RESOLVE;
+void mqtt_worker_keepalive_test(void) {
+    /* wait 2 hours for mqtt connection, samples has to be stored in nvs */
+    int64_t mqtt_alive_timeout = CONFIG_MQTT_KEEPALIVE_TIMEOUT_MINS * 60 * 1000;
+    if (k_uptime_get() > LastKeepaliveResp + mqtt_alive_timeout) {
+        sys_reboot(SYS_REBOOT_COLD);
+    }
 }
 
 int32_t mqtt_worker_publish_qos1(const char *topic, const char *fmt, ...) {
@@ -126,14 +132,15 @@ int32_t mqtt_worker_publish_qos1(const char *topic, const char *fmt, ...) {
 
     struct mqtt_client *client = &ClientCtx;
 
-    k_sem_take(&PublishAck, K_NO_WAIT);
+    k_sem_take(&PublishAckSem, K_NO_WAIT);
     res = mqtt_publish(client, &PubData);
     if (0 != res) {
         LOG_ERR("could not publish, err %d", res);
         goto failed_done;
     }
 
-    res = k_sem_take(&PublishAck, K_SECONDS(MQTT_WORKER_PUBLISH_ACK_TIMEOUT));
+    res =
+        k_sem_take(&PublishAckSem, K_SECONDS(MQTT_WORKER_PUBLISH_ACK_TIMEOUT));
     if (0 != res) {
         LOG_ERR("publish ack timeout");
     }
@@ -174,6 +181,22 @@ void mqtt_worker_init(const char *hostname, int32_t port,
     PubData.message_id = 1U;
     PubData.dup_flag = 0U;
     PubData.retain_flag = 1U;
+
+    net_on_disconnect_reqister(mqtt_worker_disconnect);
+    k_sem_give(&WorkerProcStartSem);
+
+    int32_t sec_cnt = 0;
+    for (sec_cnt = 0; sec_cnt < CONFIG_MQTT_FIRST_CONN_TIMEOUT_SEC; sec_cnt++) {
+        wdg_feed();
+        if (0 == k_sem_take(&ConectedAckSem, K_SECONDS(1))) {
+            break;
+        }
+    }
+
+    if (CONFIG_MQTT_FIRST_CONN_TIMEOUT_SEC == sec_cnt) {
+        LOG_ERR("Mqtt connection timeout");
+        sys_reboot(SYS_REBOOT_COLD);
+    }
 }
 
 static void subscribe_proc(void *arg1, void *arg2, void *arg3) {
@@ -191,8 +214,10 @@ static void subscribe_proc(void *arg1, void *arg2, void *arg3) {
 }
 
 static void mqtt_proc(void *arg1, void *arg2, void *arg3) {
-    StateMachine = DISCONNECTED;
+    StateMachine = DNS_RESOLVE;
     Connected = false;
+
+    k_sem_take(&WorkerProcStartSem, K_FOREVER);
     for (;;) {
         switch (StateMachine) {
             case DNS_RESOLVE: {
@@ -255,6 +280,10 @@ static void mqtt_proc(void *arg1, void *arg2, void *arg3) {
             }
         }
     }
+}
+
+static void mqtt_worker_disconnect(int32_t reason) {
+    DisconnectReqExternal = true;
 }
 
 static int32_t mqtt_worker_subscribe(void) {
@@ -375,7 +404,7 @@ static int32_t input_handle(void) {
 
         if (DisconnectReqExternal) {
             mqtt_disconnect(client);
-            k_sem_take(&ConectedAck, K_NO_WAIT);
+            k_sem_take(&ConectedAckSem, K_NO_WAIT);
             Connected = false;
             res = -1;
             goto failed_done;
@@ -383,7 +412,7 @@ static int32_t input_handle(void) {
     } else {
         LOG_INF("Keepalive...");
         mqtt_live(client);
-        next_alive = uptime_ms + (MQTT_WORKER_PING_TIMEOUT * MSEC_PER_SEC);
+        next_alive = uptime_ms + (60 * MSEC_PER_SEC);
     }
 
     res = 0; /* success done */
@@ -455,14 +484,14 @@ static void mqtt_evt_handler(struct mqtt_client *const client,
             } else {
                 Connected = true;
                 LastKeepaliveResp = k_uptime_get();
-                k_sem_give(&ConectedAck);
+                k_sem_give(&ConectedAckSem);
             }
             break;
         }
         case MQTT_EVT_DISCONNECT: {
             LOG_ERR("MQTT client disconnected %d", evt->result);
             Connected = false;
-            k_sem_take(&ConectedAck, K_NO_WAIT);
+            k_sem_take(&ConectedAckSem, K_NO_WAIT);
             break;
         }
         case MQTT_EVT_PUBLISH: {
@@ -553,7 +582,7 @@ static void mqtt_evt_handler(struct mqtt_client *const client,
                 LOG_ERR("PUBACK error %d", evt->result);
             } else {
                 LOG_INF("PUBACK packet id: %u", evt->param.puback.message_id);
-                k_sem_give(&PublishAck);
+                k_sem_give(&PublishAckSem);
             }
             break;
         }

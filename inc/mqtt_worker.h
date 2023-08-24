@@ -14,7 +14,7 @@
 #define MQTT_WORKER_MAX_PAYLOAD_LEN     (256)
 #define MQTT_WORKER_MAX_PUBLISH_LEN     (512)
 #define MQTT_WORKER_PUBLISH_ACK_TIMEOUT (4)  /* seconds */
-#define MQTT_WORKER_PING_TIMEOUT        (60) /* secs*/
+#define MQTT_WORKER_PING_TIMEOUT        (60) /* secs */
 
 typedef void (*subs_cb_t)(char *topic, uint16_t topic_len, char *payload,
                           uint16_t payload_len);
@@ -40,30 +40,11 @@ void mqtt_worker_init(const char *hostname, int32_t port,
 int32_t mqtt_worker_publish_qos1(const char *topic, const char *fmt, ...);
 
 /**
- * @brief Typically put to network disconnect callback to notify mqtt stack
- * about network absence. This will speed up reconnection process.
- */
-void mqtt_worker_disconnect(void);
-
-/**
- * @brief Make broker connection attempt.
- */
-void mqtt_worker_connection_attempt(void);
-
-/**
- * @brief Wait for mqtt connection given time in millis
+ * @brief Test if last keepalive response is longer than
+ * CONFIG_MQTT_KEEPALIVE_TIMEOUT_MINS, if yes, then reboot device.
  *
- * @param timeout_ms time to wait for mqtt connection
- * @return int32_t 0 success, errno code otherwise
  */
-int32_t mqtt_worker_connection_wait(uint32_t timeout_ms);
-
-/**
- * @brief Function to return last keepalive response
- *
- * @return int64_t System millis timestamp
- */
-int64_t mqtt_worker_last_keepalive_resp(void);
+void mqtt_worker_keepalive_test(void);
 
 #endif /* MQTT_WORKER_H_ */
 /* ---------------------------------------------------------------------------

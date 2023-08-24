@@ -25,9 +25,8 @@ int64_t timestamp_get(void);
 /**
  * @brief Update internal timer to be up-to-date with epoch time.
  *
- * @param period_secs Update period in seconds
  */
-void timestamp_update(int64_t period_secs);
+void timestamp_update(void);
 
 #endif /* TIMESTAMP_H_ */
 /* ---------------------------------------------------------------------------
