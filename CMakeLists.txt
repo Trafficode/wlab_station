@@ -8,7 +8,7 @@ project(wlab_station)
 target_include_directories(app PRIVATE inc)
 
 target_sources(app PRIVATE 
-    src/main.c
+    main.c
     src/wifi_net.c
     src/mqtt_worker.c
     src/wlab.c
