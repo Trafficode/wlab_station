@@ -44,16 +44,15 @@ int main(void) {
     timestamp_init();
     wlab_init();
 
-    int64_t ts_now = 0;
     for (;;) {
-        k_sleep(K_MSEC(100));
-        gpio_pin_toggle_dt(&InfoLed);
-
-        ts_now = timestamp_get();
+        int64_t ts_now = timestamp_get();
         wlab_process(ts_now);
         timestamp_update();
         mqtt_worker_keepalive_test();
         wdg_feed();
+
+        k_sleep(K_MSEC(100));
+        gpio_pin_toggle_dt(&InfoLed);
     }
 }
 
