@@ -12,6 +12,14 @@
             gpios = <&gpio0 4 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
         };
     };
+
+    user_buttons {
+		compatible = "gpio-keys";
+		config_btn: config_btn {
+			gpios = <&gpio0 5 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Config mode enter";
+		};
+	};
 };
 
 &wifi {

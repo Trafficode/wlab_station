@@ -27,9 +27,13 @@ LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_DBG);
 static const struct gpio_dt_spec InfoLed =
     GPIO_DT_SPEC_GET(DT_NODELABEL(info_led), gpios);
 
-bool InitedMode = true;
+static const struct gpio_dt_spec ConfigButton =
+    GPIO_DT_SPEC_GET(DT_NODELABEL(config_btn), gpios);
+
+static bool ConfiguredMode = true;
 
 int main(void) {
+    int ret = 0;
     struct net_settings net_sett = {};
     wdg_init(CONFIG_WDG_TIMEOUT_SEC);
 
@@ -39,10 +43,18 @@ int main(void) {
             SYS_KERNEL_VER_MAJOR(ver), SYS_KERNEL_VER_MINOR(ver),
             SYS_KERNEL_VER_PATCHLEVEL(ver));
 
-    gpio_pin_configure_dt(&InfoLed, GPIO_OUTPUT_ACTIVE);
+    ret = gpio_pin_configure_dt(&InfoLed, GPIO_OUTPUT_ACTIVE);
+    __ASSERT((ret == 0), "info led init failed");
+    ret = gpio_pin_configure_dt(&ConfigButton, GPIO_INPUT);
+    __ASSERT((ret == 0), "config button init failed");
+
     nvs_data_init();
     nvs_data_net_settings_get(&net_sett);
-    if (InitedMode) {
+    if (gpio_pin_get_dt(&ConfigButton)) {
+        LOG_WRN("CONFIG MODE ENABLED");
+    }
+
+    if (ConfiguredMode) {
         wifi_net_init(WIFI_SSID, WIFI_PASS);
         mqtt_worker_init(CONFIG_WLAB_MQTT_BROKER, CONFIG_WLAB_MQTT_BROKER_PORT,
                          NULL, NULL);
@@ -54,7 +66,11 @@ int main(void) {
         k_sleep(K_MSEC(100));
         wdg_feed();
         gpio_pin_toggle_dt(&InfoLed);
-        if (!InitedMode) {
+        if (gpio_pin_get_dt(&ConfigButton)) {
+            sys_reboot(SYS_REBOOT_COLD);
+        }
+
+        if (!ConfiguredMode) {
             continue;
         }
 
