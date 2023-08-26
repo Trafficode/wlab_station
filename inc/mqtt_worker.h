@@ -36,8 +36,9 @@ void mqtt_worker_init(const char *hostname, int32_t port,
 /**
  * @brief Publish data to given topic. Use in the same way as typical printf().
  * @param topic Topic where msg will be published
+ * @return Negative errno code
  */
-int32_t mqtt_worker_publish_qos1(const char *topic, const char *fmt, ...);
+int mqtt_worker_publish_qos1(const char *topic, const char *fmt, ...);
 
 /**
  * @brief Test if last keepalive response is longer than

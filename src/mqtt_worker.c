@@ -109,15 +109,15 @@ void mqtt_worker_keepalive_test(void) {
     }
 }
 
-int32_t mqtt_worker_publish_qos1(const char *topic, const char *fmt, ...) {
-    int32_t res = 0;
+int mqtt_worker_publish_qos1(const char *topic, const char *fmt, ...) {
+    int ret = 0;
 
     va_list args;
     va_start(args, fmt);
 
     if (!Connected || DisconnectReqExternal) {
         LOG_WRN("Cannot publish, client not connected");
-        res = -ENETUNREACH;
+        ret = -ENETUNREACH;
         goto failed_done;
     }
 
@@ -133,21 +133,21 @@ int32_t mqtt_worker_publish_qos1(const char *topic, const char *fmt, ...) {
     struct mqtt_client *client = &ClientCtx;
 
     k_sem_take(&PublishAckSem, K_NO_WAIT);
-    res = mqtt_publish(client, &PubData);
-    if (0 != res) {
-        LOG_ERR("could not publish, err %d", res);
+    ret = mqtt_publish(client, &PubData);
+    if (ret != 0) {
+        LOG_ERR("could not publish, err %d", ret);
         goto failed_done;
     }
 
-    res =
+    ret =
         k_sem_take(&PublishAckSem, K_SECONDS(MQTT_WORKER_PUBLISH_ACK_TIMEOUT));
-    if (0 != res) {
+    if (ret != 0) {
         LOG_ERR("publish ack timeout");
     }
 
 failed_done:
     va_end(args);
-    return (res);
+    return (ret);
 }
 
 void mqtt_worker_init(const char *hostname, int32_t port,
@@ -192,11 +192,8 @@ void mqtt_worker_init(const char *hostname, int32_t port,
             break;
         }
     }
-
-    if (CONFIG_MQTT_FIRST_CONN_TIMEOUT_SEC == sec_cnt) {
-        LOG_ERR("Mqtt connection timeout");
-        sys_reboot(SYS_REBOOT_COLD);
-    }
+    __ASSERT((CONFIG_MQTT_FIRST_CONN_TIMEOUT_SEC != sec_cnt),
+             "Mqtt connection timeout");
 }
 
 static void subscribe_proc(void *arg1, void *arg2, void *arg3) {
@@ -222,8 +219,8 @@ static void mqtt_proc(void *arg1, void *arg2, void *arg3) {
         switch (StateMachine) {
             case DNS_RESOLVE: {
                 LOG_INF("DNS_RESOLVE");
-                int32_t res = dns_resolve();
-                if (0 == res) {
+                int ret = dns_resolve();
+                if (0 == ret) {
                     StateMachine = CONNECT_TO_BROKER;
                 } else {
                     k_sleep(K_SECONDS(2));
@@ -233,7 +230,7 @@ static void mqtt_proc(void *arg1, void *arg2, void *arg3) {
             case CONNECT_TO_BROKER: {
                 LOG_INF("CONNECT_TO_BROKER");
                 static int32_t err_trials = 0;
-                int32_t res = connect_to_broker();
+                int res = connect_to_broker();
                 if (0 == res) {
                     LOG_INF("MQTT client connected!");
                     StateMachine = SUBSCRIBE;
@@ -251,8 +248,8 @@ static void mqtt_proc(void *arg1, void *arg2, void *arg3) {
             case SUBSCRIBE: {
                 LOG_INF("SUBSCRIBE");
                 static int32_t err_trials = 0;
-                int32_t res = mqtt_worker_subscribe();
-                if (0 == res) {
+                int ret = mqtt_worker_subscribe();
+                if (0 == ret) {
                     LOG_INF("Subscribe done");
                     StateMachine = CONNECTED;
                     err_trials = 0;
@@ -266,8 +263,8 @@ static void mqtt_proc(void *arg1, void *arg2, void *arg3) {
             }
             case CONNECTED: {
                 LOG_DBG("CONNECTED");
-                int32_t res = input_handle();
-                if (0 != res) {
+                int ret = input_handle();
+                if (0 != ret) {
                     StateMachine = DNS_RESOLVE;
                 }
                 break;
@@ -286,9 +283,9 @@ static void mqtt_worker_disconnect(int32_t reason) {
     DisconnectReqExternal = true;
 }
 
-static int32_t mqtt_worker_subscribe(void) {
+static int mqtt_worker_subscribe(void) {
     struct mqtt_client *client = &ClientCtx;
-    int32_t res = 0;
+    int ret = 0;
 
     if (NULL == SubsList) {
         LOG_WRN("Subscription list empty");
@@ -296,16 +293,16 @@ static int32_t mqtt_worker_subscribe(void) {
     }
 
     Subscribed = false;
-    res = mqtt_subscribe(client, SubsList);
-    if (0 != res) {
-        LOG_ERR("Failed to subscribe topics, err %d", res);
+    ret = mqtt_subscribe(client, SubsList);
+    if (0 != ret) {
+        LOG_ERR("Failed to subscribe topics, err %d", ret);
         goto failed_done;
     }
 
     while (true) {
         LastEvt = 0xFF;
-        res = wait_for_input(4000);
-        if (0 < res) {
+        ret = wait_for_input(4000);
+        if (0 < ret) {
             mqtt_input(client);
             if (LastEvt != MQTT_EVT_SUBACK && LastEvt != 0xFF) {
                 LOG_WRN("Unexpected event got, try again");
@@ -318,14 +315,14 @@ static int32_t mqtt_worker_subscribe(void) {
     if (!Subscribed) {
         LOG_ERR("Subscribe timeout");
     } else {
-        res = 0;
+        ret = 0;
     }
 
 failed_done:
-    return (res);
+    return (ret);
 }
 
-static int32_t wait_for_input(int32_t timeout) {
+static int wait_for_input(int32_t timeout) {
 #if defined(CONFIG_MQTT_LIB_TLS)
     struct zsock_pollfd fds[1] = {
         [0] =
@@ -346,59 +343,59 @@ static int32_t wait_for_input(int32_t timeout) {
     };
 #endif
 
-    int32_t res = zsock_poll(fds, 1, timeout);
-    if (0 > res) {
-        LOG_ERR("zsock_poll event err %d", res);
+    int ret = zsock_poll(fds, 1, timeout);
+    if (0 > ret) {
+        LOG_ERR("zsock_poll event err %d", ret);
     }
 
-    return (res);
+    return (ret);
 }
 
-static int32_t connect_to_broker(void) {
+static int connect_to_broker(void) {
     struct mqtt_client *client = &ClientCtx;
-    int32_t res = 0;
+    int ret = 0;
 
     DisconnectReqExternal = false;
     Connected = false;
-    res = mqtt_connect(client);
-    if (res != 0) {
-        LOG_ERR("mqtt_connect, err %d", res);
+    ret = mqtt_connect(client);
+    if (ret != 0) {
+        LOG_ERR("mqtt_connect, err %d", ret);
         mqtt_disconnect(client);
         goto failed_done;
     }
 
-    res = wait_for_input(2000);
-    if (0 < res) {
+    ret = wait_for_input(2000);
+    if (0 < ret) {
         mqtt_input(client);
     }
 
     if (!Connected) {
         LOG_ERR("Connection timeout, abort...");
         mqtt_abort(client);
-        res = -1;
+        ret = -1;
     } else {
-        res = 0;
+        ret = 0;
     }
 
 failed_done:
-    return (res);
+    return (ret);
 }
 
-static int32_t input_handle(void) {
-    int32_t res = 0;
+static int input_handle(void) {
+    int ret = 0;
     struct mqtt_client *client = &ClientCtx;
     static int64_t next_alive = INT64_MIN;
 
     /* idle and process messages */
     int64_t uptime_ms = k_uptime_get();
     if (uptime_ms < next_alive) {
-        res = wait_for_input(1 * MSEC_PER_SEC);
-        if (0 < res) {
+        ret = wait_for_input(1 * MSEC_PER_SEC);
+        if (0 < ret) {
             mqtt_input(client);
         }
 
         if (!Connected) {
-            res = -1;
+            ret = -1;
             goto failed_done;
         }
 
@@ -406,7 +403,7 @@ static int32_t input_handle(void) {
             mqtt_disconnect(client);
             k_sem_take(&ConectedAckSem, K_NO_WAIT);
             Connected = false;
-            res = -1;
+            ret = -1;
             goto failed_done;
         }
     } else {
@@ -415,16 +412,16 @@ static int32_t input_handle(void) {
         next_alive = uptime_ms + (60 * MSEC_PER_SEC);
     }
 
-    res = 0; /* success done */
+    ret = 0; /* success done */
 
 failed_done:
-    return (res);
+    return (ret);
 }
 
-static int32_t dns_resolve(void) {
+static int dns_resolve(void) {
     static struct zsock_addrinfo hints;
     struct zsock_addrinfo *haddr;
-    int32_t res = 0;
+    int ret = 0;
     uint8_t *in_addr = NULL;
 
     memset(&Broker, 0, sizeof(struct sockaddr_storage));
@@ -432,12 +429,12 @@ static int32_t dns_resolve(void) {
 
     ipv4_broker->sin_family = AF_INET;
     ipv4_broker->sin_port = htons(BrokerPort);
-    res = zsock_inet_pton(AF_INET, BrokerHostnameStr, &ipv4_broker->sin_addr);
-    if (0 != res) {
+    ret = zsock_inet_pton(AF_INET, BrokerHostnameStr, &ipv4_broker->sin_addr);
+    if (ret != 0) {
         in_addr = ipv4_broker->sin_addr.s4_addr;
         LOG_INF("Broker addr %d.%d.%d.%d", in_addr[0], in_addr[1], in_addr[2],
                 in_addr[3]);
-        res = 0; /* 0 - success, string ip address delivered, dns not needed */
+        ret = 0; /* 0 - success, string ip address delivered, dns not needed */
         goto resolve_done;
     }
 
@@ -445,10 +442,10 @@ static int32_t dns_resolve(void) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = 0;
 
-    res = net_getaddrinfo_addr_str(BrokerHostnameStr, BrokerPortStr, &hints,
+    ret = net_getaddrinfo_addr_str(BrokerHostnameStr, BrokerPortStr, &hints,
                                    &haddr);
-    if (0 != res) {
-        LOG_ERR("Unable to get address of broker, err %d", res);
+    if (ret != 0) {
+        LOG_ERR("Unable to get address of broker, err %d", ret);
         goto resolve_done;
     }
 
@@ -460,7 +457,7 @@ static int32_t dns_resolve(void) {
             in_addr[3]);
 
 resolve_done:
-    return (res);
+    return (ret);
 }
 
 static void mqtt_evt_handler(struct mqtt_client *const client,
@@ -569,8 +566,8 @@ static void mqtt_evt_handler(struct mqtt_client *const client,
                 memcpy(subs_data->topic, pub->message.topic.topic.utf8,
                        subs_data->topic_len);
                 subs_data->topic[subs_data->topic_len] = '\0';
-                int32_t res = k_msgq_put(&SubsQueue, &subs_data, K_MSEC(1000));
-                if (0 != res) {
+                int32_t ret = k_msgq_put(&SubsQueue, &subs_data, K_MSEC(1000));
+                if (0 != ret) {
                     LOG_ERR("Timeout to put subs msg into queue");
                 }
             }

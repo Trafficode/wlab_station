@@ -10,25 +10,6 @@
 
 #include "config_wlab.h"
 
-#define WLAB_TEMP_SERIE     (1)
-#define WLAB_HUMIDITY_SERIE (2)
-
-/* Sometimes max return weird value not fitted to the other if this value
- * will be more than WLAB_EXT2AVG_MAX then skip */
-#define WLAB_EXT2AVG_MAX       (32)
-#define WLAB_MIN_SAMPLES_COUNT (8)
-
-typedef struct {
-    int32_t _min;
-    int32_t _max;
-    uint32_t _max_ts;
-    uint32_t _min_ts;
-    int32_t buff;
-    int32_t cnt;
-    uint32_t sample_ts;
-    int32_t sample_ts_val;
-} buffer_t;
-
 /**
  * @brief Initialize weatherlab service with provided sensor type
  *

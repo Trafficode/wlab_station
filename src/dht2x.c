@@ -64,7 +64,7 @@ static void gpio_callback(const struct device *dev, struct gpio_callback *cb,
     PulseStartUs = us_now;
 }
 
-int32_t dht2x_init(const struct gpio_dt_spec *dhtx_spec) {
+int dht2x_init(const struct gpio_dt_spec *dhtx_spec) {
     if (!device_is_ready(dhtx_spec->port)) {
         LOG_ERR("Dht2x gpio not ready");
         return -EIO;
@@ -74,9 +74,9 @@ int32_t dht2x_init(const struct gpio_dt_spec *dhtx_spec) {
     return (0);
 }
 
-int32_t dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
-                   int16_t *rh) {
-    int32_t rc = 0;
+int dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
+               int16_t *rh) {
+    int ret = 0;
     LOG_INF("%s", __FUNCTION__);
 
     k_sem_take(&DhtReadDone, K_NO_WAIT);
@@ -100,10 +100,10 @@ int32_t dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
     gpio_add_callback_dt(dhtx_spec, &IrqCb);
     k_sched_unlock();
 
-    int32_t res = k_sem_take(&DhtReadDone, K_MSEC(50));
-    if (0 != res) {
+    ret = k_sem_take(&DhtReadDone, K_MSEC(50));
+    if (0 != ret) {
         LOG_ERR("Read failed, PulseCnt %d", PulseCnt);
-        rc = -EIO;
+        ret = -EIO;
         goto read_done;
     } else {
         LOG_INF("Read done, PulseCnt %d, LastElapsed %u, ReadData %010llX",
@@ -115,7 +115,7 @@ int32_t dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
     /* verify checksum */
     if (((buf[4] + buf[3] + buf[2] + buf[1]) & 0xFF) != buf[0] || 0 == buf[0]) {
         LOG_ERR("Invalid checksum in fetched sample");
-        rc = -ENOTSUP;
+        ret = -ENOTSUP;
         goto read_done;
     } else {
         LOG_INF("Checksum valid");
@@ -131,7 +131,7 @@ int32_t dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
 
 read_done:
     gpio_pin_configure_dt(dhtx_spec, GPIO_OUTPUT_INACTIVE);
-    return (rc);
+    return (ret);
 }
 
 /* ---------------------------------------------------------------------------

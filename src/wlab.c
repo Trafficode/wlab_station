@@ -22,10 +22,29 @@
 
 LOG_MODULE_REGISTER(WLAB, LOG_LEVEL_DBG);
 
+#define WLAB_TEMP_SERIE     (1)
+#define WLAB_HUMIDITY_SERIE (2)
+
+/* Sometimes max return weird value not fitted to the other if this value
+ * will be more than WLAB_EXT2AVG_MAX then skip */
+#define WLAB_EXT2AVG_MAX       (32)
+#define WLAB_MIN_SAMPLES_COUNT (8)
+
+struct wlab_buffer {
+    int32_t _min;
+    int32_t _max;
+    uint32_t _max_ts;
+    uint32_t _min_ts;
+    int32_t buff;
+    int32_t cnt;
+    uint32_t sample_ts;
+    int32_t sample_ts_val;
+};
+
 static int wlab_authorize(void);
-static bool wlab_buffer_commit(buffer_t *buffer, int32_t val, uint32_t ts,
-                               uint32_t threshold);
-static void wlab_buffer_init(buffer_t *buffer);
+static bool wlab_buffer_commit(struct wlab_buffer *buffer, int32_t val,
+                               uint32_t ts, uint32_t threshold);
+static void wlab_buffer_init(struct wlab_buffer *buffer);
 static void wlab_itostrf(char *dest, int32_t signed_int);
 
 const char *AuthTemplate =
@@ -40,28 +59,30 @@ const char *DHTJsonDataTemplate =
     "\"Humidity\":{\"f_avg\":%s,\"f_act\":%s,\"f_min\":%s,"
     "\"f_max\":%s,\"i_min_ts\":%u,\"i_max_ts\":%u}}}";
 
-static int wlab_dht_publish_sample(buffer_t *temp, buffer_t *rh);
+static int wlab_dht_publish_sample(struct wlab_buffer *temp,
+                                   struct wlab_buffer *rh);
 
 static const struct gpio_dt_spec DHTx =
     GPIO_DT_SPEC_GET(DT_NODELABEL(dht_pin), gpios);
 
-static buffer_t TempBuffer = {0}, RhBuffer = {0};
+static struct wlab_buffer TempBuffer = {0}, RhBuffer = {0};
 
 void wlab_init(void) {
-    dht2x_init(&DHTx);
+    int ret = dht2x_init(&DHTx);
+    __ASSERT((ret == 0), "Unable to init dhtx");
+
     wlab_buffer_init(&TempBuffer);
     wlab_buffer_init(&RhBuffer);
 
-    int32_t auth_attempts = 0;
-    while (0 != wlab_authorize()) {
-        auth_attempts++;
+    uint8_t auth_attempts = 0;
+    for (auth_attempts = 0; auth_attempts < 8; auth_attempts++) {
         wdg_feed();
-        if (8 == auth_attempts) {
-            /* system reboot */
-            sys_reboot(SYS_REBOOT_COLD);
+        if (0 == wlab_authorize()) {
+            LOG_INF("wlab authorize success");
+            break;
         }
     }
-    LOG_INF("wlab authorize success");
+    __ASSERT((auth_attempts < 8), "Unable to init dhtx");
 }
 
 void wlab_process(int64_t timestamp_secs) {
@@ -119,7 +140,8 @@ process_done:
     return;
 }
 
-static int32_t wlab_dht_publish_sample(buffer_t *temp, buffer_t *rh) {
+static int32_t wlab_dht_publish_sample(struct wlab_buffer *temp,
+                                       struct wlab_buffer *rh) {
     int32_t rc = 0;
     int32_t temp_avg = 0, rh_avg = 0;
     char tavg_str[8], tact_str[8], tmin_str[8], tmax_str[8];
@@ -168,7 +190,7 @@ static void wlab_itostrf(char *dest, int32_t signed_int) {
     }
 }
 
-static void wlab_buffer_init(buffer_t *buffer) {
+static void wlab_buffer_init(struct wlab_buffer *buffer) {
     buffer->buff = 0;
     buffer->cnt = 0;
     buffer->_max = INT32_MIN;
@@ -183,8 +205,8 @@ static void wlab_buffer_init(buffer_t *buffer) {
  * @brief When val exceeds MIN or MAX value more than threshold then skip this
  * measuremnt. It was neccessary to add when pt100 and maxXXXX is a sensor.
  */
-static bool wlab_buffer_commit(buffer_t *buffer, int32_t val, uint32_t ts,
-                               uint32_t threshold) {
+static bool wlab_buffer_commit(struct wlab_buffer *buffer, int32_t val,
+                               uint32_t ts, uint32_t threshold) {
     bool rc = false;
     if (buffer->cnt > 4) {
         if ((buffer->_max != INT32_MIN) && ((val - threshold) > buffer->_max)) {
