@@ -70,8 +70,7 @@ int dht2x_init(const struct gpio_dt_spec *dhtx_spec) {
         return -EIO;
     }
 
-    gpio_pin_configure_dt(dhtx_spec, GPIO_OUTPUT_INACTIVE);
-    return (0);
+    return gpio_pin_configure_dt(dhtx_spec, GPIO_OUTPUT_INACTIVE);
 }
 
 int dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,

@@ -30,7 +30,7 @@ static const struct gpio_dt_spec InfoLed =
 static const struct gpio_dt_spec ConfigButton =
     GPIO_DT_SPEC_GET(DT_NODELABEL(config_btn), gpios);
 
-static bool ConfiguredMode = true;
+static bool ConfigureMode = false;
 
 int main(void) {
     int ret = 0;
@@ -50,28 +50,30 @@ int main(void) {
 
     nvs_data_init();
     nvs_data_net_settings_get(&net_sett);
-    if (gpio_pin_get_dt(&ConfigButton)) {
+    if (gpio_pin_get_dt(&ConfigButton) || (0 == net_sett.wifi_ssid[0])) {
         LOG_WRN("CONFIG MODE ENABLED");
+        // ConfigureMode = true;
     }
 
-    if (ConfiguredMode) {
+    if (!ConfigureMode) {
         wifi_net_init(WIFI_SSID, WIFI_PASS);
         mqtt_worker_init(CONFIG_WLAB_MQTT_BROKER, CONFIG_WLAB_MQTT_BROKER_PORT,
                          NULL, NULL);
         timestamp_init();
+        wlab_init();
     }
-    wlab_init();
 
     for (;;) {
         k_sleep(K_MSEC(100));
         wdg_feed();
         gpio_pin_toggle_dt(&InfoLed);
-        if (gpio_pin_get_dt(&ConfigButton)) {
-            sys_reboot(SYS_REBOOT_COLD);
+
+        if (ConfigureMode) {
+            continue;
         }
 
-        if (!ConfiguredMode) {
-            continue;
+        if (gpio_pin_get_dt(&ConfigButton)) {
+            sys_reboot(SYS_REBOOT_COLD);
         }
 
         int64_t ts_now = timestamp_get();
