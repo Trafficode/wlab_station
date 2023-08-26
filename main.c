@@ -51,16 +51,17 @@ int main(void) {
     wlab_init();
 
     for (;;) {
-        if (InitedMode) {
-            int64_t ts_now = timestamp_get();
-            wlab_process(ts_now);
-            timestamp_update();
-            mqtt_worker_keepalive_test();
-        }
-
         k_sleep(K_MSEC(100));
         wdg_feed();
         gpio_pin_toggle_dt(&InfoLed);
+        if (!InitedMode) {
+            continue;
+        }
+
+        int64_t ts_now = timestamp_get();
+        wlab_process(ts_now);
+        timestamp_update();
+        mqtt_worker_keepalive_test();
     }
 }
 
