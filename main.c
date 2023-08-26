@@ -27,7 +27,10 @@ LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_DBG);
 static const struct gpio_dt_spec InfoLed =
     GPIO_DT_SPEC_GET(DT_NODELABEL(info_led), gpios);
 
+bool InitedMode = true;
+
 int main(void) {
+    struct net_settings net_sett = {};
     wdg_init(CONFIG_WDG_TIMEOUT_SEC);
 
     uint32_t ver = sys_kernel_version_get();
@@ -38,20 +41,25 @@ int main(void) {
 
     gpio_pin_configure_dt(&InfoLed, GPIO_OUTPUT_ACTIVE);
     nvs_data_init();
-    wifi_net_init(WIFI_SSID, WIFI_PASS);
-    mqtt_worker_init(CONFIG_WLAB_MQTT_BROKER, CONFIG_WLAB_MQTT_BROKER_PORT,
-                     NULL, NULL);
-    timestamp_init();
+    nvs_data_net_settings_get(&net_sett);
+    if (InitedMode) {
+        wifi_net_init(WIFI_SSID, WIFI_PASS);
+        mqtt_worker_init(CONFIG_WLAB_MQTT_BROKER, CONFIG_WLAB_MQTT_BROKER_PORT,
+                         NULL, NULL);
+        timestamp_init();
+    }
     wlab_init();
 
     for (;;) {
-        int64_t ts_now = timestamp_get();
-        wlab_process(ts_now);
-        timestamp_update();
-        mqtt_worker_keepalive_test();
-        wdg_feed();
+        if (InitedMode) {
+            int64_t ts_now = timestamp_get();
+            wlab_process(ts_now);
+            timestamp_update();
+            mqtt_worker_keepalive_test();
+        }
 
         k_sleep(K_MSEC(100));
+        wdg_feed();
         gpio_pin_toggle_dt(&InfoLed);
     }
 }

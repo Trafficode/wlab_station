@@ -11,6 +11,7 @@
 #include <zephyr/fs/nvs.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/storage/flash_map.h>
+#include <zephyr/sys/util.h>
 
 LOG_MODULE_REGISTER(NVSDATA, LOG_LEVEL_DBG);
 
@@ -25,8 +26,7 @@ void nvs_data_init(void) {
             ;
     }
     Fs.offset = NVS_PARTITION_OFFSET;
-    int32_t ret =
-        flash_get_page_info_by_offs(Fs.flash_device, Fs.offset, &info);
+    int ret = flash_get_page_info_by_offs(Fs.flash_device, Fs.offset, &info);
     if (ret) {
         LOG_ERR("Unable to get page info err %d", ret);
         while (true)
@@ -59,6 +59,31 @@ void nvs_data_init(void) {
         LOG_INF("Save boot counter %d succ", boot_counter);
     } else {
         LOG_ERR("Save boot counter %d err", boot_counter);
+    }
+}
+
+void nvs_data_net_settings_get(struct net_settings *dst) {
+    __ASSERT((dst != NULL), "null pointer passed");
+    size_t net_settings_len = sizeof(struct net_settings);
+
+    int ret = nvs_read(&Fs, NVS_ID_BOOT_COUNT, dst, net_settings_len);
+    if (ret > 0) { /* item was found, show it */
+        LOG_INF("net_settings->wifi_ssid: %s", dst->wifi_ssid);
+        LOG_INF("net_settings->wifi_ssid: %s", dst->wifi_pass);
+        LOG_INF("net_settings->wifi_ssid: %s", dst->mqtt_broker);
+        LOG_INF("net_settings->wifi_ssid: %u", dst->mqtt_port);
+    } else { /* item was not found, add it */
+        LOG_WRN("No net_settings found, restore default");
+        memset(dst->wifi_ssid, 0x00, CONFIG_NET_SETTINGS_MAX_STRING_LEN);
+        memset(dst->wifi_pass, 0x00, CONFIG_NET_SETTINGS_MAX_STRING_LEN);
+        memset(dst->mqtt_broker, 0x00, CONFIG_NET_SETTINGS_MAX_STRING_LEN);
+
+        if (net_settings_len ==
+            nvs_write(&Fs, NVS_ID_BOOT_COUNT, dst, net_settings_len)) {
+            LOG_INF("Network settings cleared");
+        } else {
+            LOG_ERR("Network settings clear failed");
+        }
     }
 }
 

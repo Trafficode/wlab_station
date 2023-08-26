@@ -265,7 +265,7 @@ static void mqtt_proc(void *arg1, void *arg2, void *arg3) {
                 }
             }
             case CONNECTED: {
-                LOG_INF("CONNECTED");
+                LOG_DBG("CONNECTED");
                 int32_t res = input_handle();
                 if (0 != res) {
                     StateMachine = DNS_RESOLVE;
