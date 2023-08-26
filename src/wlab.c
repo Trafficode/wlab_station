@@ -69,7 +69,7 @@ static struct wlab_buffer TempBuffer = {0}, RhBuffer = {0};
 
 void wlab_init(void) {
     int ret = dht2x_init(&DHTx);
-    __ASSERT((ret == 0), "Unable to init dhtx");
+    __ASSERT((0 == ret), "Unable to init dhtx");
 
     wlab_buffer_init(&TempBuffer);
     wlab_buffer_init(&RhBuffer);

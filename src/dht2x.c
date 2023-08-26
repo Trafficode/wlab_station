@@ -89,7 +89,6 @@ int dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
 
     k_sleep(K_MSEC(18));
 
-    k_sched_lock();
     gpio_pin_set_dt(dhtx_spec, false);
     PulseStartUs = dht2x_us_now();
 
@@ -97,7 +96,6 @@ int dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
     gpio_pin_interrupt_configure_dt(dhtx_spec, GPIO_INT_EDGE_FALLING);
     gpio_init_callback(&IrqCb, gpio_callback, BIT(dhtx_spec->pin));
     gpio_add_callback_dt(dhtx_spec, &IrqCb);
-    k_sched_unlock();
 
     ret = k_sem_take(&DhtReadDone, K_MSEC(50));
     if (0 != ret) {

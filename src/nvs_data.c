@@ -27,7 +27,7 @@ void nvs_data_init(void) {
 
     Fs.offset = NVS_PARTITION_OFFSET;
     ret = flash_get_page_info_by_offs(Fs.flash_device, Fs.offset, &info);
-    __ASSERT((ret == 0), "Unable to get page info err %d", ret);
+    __ASSERT((0 == ret), "Unable to get page info err %d", ret);
 
     LOG_INF("NVS sector size %u part size %u", info.size, NVS_PARTITION_SIZE);
 
@@ -35,7 +35,7 @@ void nvs_data_init(void) {
     Fs.sector_count = NVS_PARTITION_SIZE / info.size;
 
     ret = nvs_mount(&Fs);
-    __ASSERT((ret == 0), "Flash mount failed");
+    __ASSERT((0 == ret), "Flash mount failed");
 
     uint32_t boot_counter = UINT32_C(0);
     size_t area_len = sizeof(boot_counter);

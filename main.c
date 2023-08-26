@@ -44,9 +44,9 @@ int main(void) {
             SYS_KERNEL_VER_PATCHLEVEL(ver));
 
     ret = gpio_pin_configure_dt(&InfoLed, GPIO_OUTPUT_ACTIVE);
-    __ASSERT((ret == 0), "info led init failed");
+    __ASSERT((0 == ret), "Info led init failed");
     ret = gpio_pin_configure_dt(&ConfigButton, GPIO_INPUT);
-    __ASSERT((ret == 0), "config button init failed");
+    __ASSERT((0 == ret), "Config button init failed");
 
     nvs_data_init();
     nvs_data_net_settings_get(&net_sett);
