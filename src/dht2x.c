@@ -76,7 +76,7 @@ int dht2x_init(const struct gpio_dt_spec *dhtx_spec) {
 int dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
                int16_t *rh) {
     int ret = 0;
-    LOG_INF("%s", __FUNCTION__);
+    LOG_DBG("%s", __FUNCTION__);
 
     k_sem_take(&DhtReadDone, K_NO_WAIT);
     PulseCnt = 0;
@@ -103,7 +103,7 @@ int dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
         ret = -EIO;
         goto read_done;
     } else {
-        LOG_INF("Read done, PulseCnt %d, LastElapsed %u, ReadData %010llX",
+        LOG_DBG("Read done, PulseCnt %d, LastElapsed %u, ReadData %010llX",
                 PulseCnt, LastElapsed, ReadData);
     }
 
@@ -115,7 +115,7 @@ int dht2x_read(const struct gpio_dt_spec *dhtx_spec, int16_t *temp,
         ret = -ENOTSUP;
         goto read_done;
     } else {
-        LOG_INF("Checksum valid");
+        LOG_DBG("Checksum valid");
     }
 
     *rh = (ReadData >> 24) & 0xFFFF;

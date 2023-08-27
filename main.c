@@ -34,7 +34,7 @@ static bool ConfigureMode = false;
 
 int main(void) {
     int ret = 0;
-    struct net_settings net_sett = {};
+    struct wifi_config wificfg = {};
     wdg_init(CONFIG_WDG_TIMEOUT_SEC);
 
     uint32_t ver = sys_kernel_version_get();
@@ -49,8 +49,8 @@ int main(void) {
     __ASSERT((0 == ret), "Config button init failed");
 
     nvs_data_init();
-    nvs_data_net_settings_get(&net_sett);
-    if (gpio_pin_get_dt(&ConfigButton) || (0 == net_sett.wifi_ssid[0])) {
+    nvs_data_wifi_config_get(&wificfg);
+    if (gpio_pin_get_dt(&ConfigButton) || (0 == wificfg.wifi_ssid[0])) {
         LOG_WRN("CONFIG MODE ENABLED");
         // ConfigureMode = true;
     }

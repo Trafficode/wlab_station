@@ -16,4 +16,5 @@ target_sources(app PRIVATE
     src/wdg.c
     src/nvs_data.c
     src/timestamp.c
+    src/shell_commands.c
 )

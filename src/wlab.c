@@ -17,6 +17,7 @@
 #include "config_wlab.h"
 #include "dht2x.h"
 #include "mqtt_worker.h"
+#include "nvs_data.h"
 #include "wdg.h"
 #include "wifi_net.h"
 
@@ -46,6 +47,7 @@ static bool wlab_buffer_commit(struct wlab_buffer *buffer, int32_t val,
                                uint32_t ts, uint32_t threshold);
 static void wlab_buffer_init(struct wlab_buffer *buffer);
 static void wlab_itostrf(char *dest, int32_t signed_int);
+static void wlab_get_str_device_id(char dst[13]);
 
 const char *AuthTemplate =
     "{\"timezone\":\"%s\",\"longitude\":%s,\"latitude\":%s,\"serie\":"
@@ -113,14 +115,14 @@ void wlab_process(int64_t timestamp_secs) {
     if ((0x00 == timeinfo.tm_min % CONFIG_WLAB_PUB_PERIOD) &&
         (timeinfo.tm_min != last_minutes)) {
         temp_avg = TempBuffer.buff / TempBuffer.cnt;
-        LOG_INF("temp - min: %d max: %d avg: %d", TempBuffer._min,
+        LOG_DBG("temp - min: %d max: %d avg: %d", TempBuffer._min,
                 TempBuffer._max, temp_avg);
 
         rh_avg = RhBuffer.buff / RhBuffer.cnt;
-        LOG_INF("rh - min: %d max: %d avg: %d", RhBuffer._min, RhBuffer._max,
+        LOG_DBG("rh - min: %d max: %d avg: %d", RhBuffer._min, RhBuffer._max,
                 rh_avg);
 
-        LOG_INF("Sample ready to send...");
+        LOG_DBG("Sample ready to send...");
         rc = wlab_dht_publish_sample(&TempBuffer, &RhBuffer);
         if (0 != rc) {
             LOG_ERR("%s, publish sample failed rc:%d", __FUNCTION__, rc);
@@ -140,30 +142,43 @@ process_done:
     return;
 }
 
-static int32_t wlab_dht_publish_sample(struct wlab_buffer *temp,
-                                       struct wlab_buffer *rh) {
-    int32_t rc = 0;
-    int32_t temp_avg = 0, rh_avg = 0;
-    char tavg_str[8], tact_str[8], tmin_str[8], tmax_str[8];
-    char rhavg_str[8], rhact_str[8], rhmin_str[8], rhmax_str[8];
-    char mac_addr[13];
+static void wlab_get_str_device_id(char dst[13]) {
+    uint64_t device_id = 0;
 
+    nvs_data_wlab_device_id_get(&device_id);
+    if (0 == device_id) {
+        net_mac_string(dst);
+    } else {
+        snprintf(dst, 13, "%012" PRIX64, device_id & 0x0000FFFFFFFFFFFF);
+    }
+    LOG_INF("Wlab device id: %s", dst);
+}
+
+static int wlab_dht_publish_sample(struct wlab_buffer *temp,
+                                   struct wlab_buffer *rh) {
+    int rc = 0;
+
+    int32_t temp_avg = 0;
+    char tavg_str[8], tact_str[8], tmin_str[8], tmax_str[8];
     temp_avg = temp->buff / temp->cnt;
     wlab_itostrf(tavg_str, temp_avg);
-    LOG_INF("%s, %d [%s]", __FUNCTION__, temp_avg, tavg_str);
+    LOG_DBG("%s, %d [%s]", __FUNCTION__, temp_avg, tavg_str);
     wlab_itostrf(tact_str, temp->sample_ts_val);
     wlab_itostrf(tmin_str, temp->_min);
     wlab_itostrf(tmax_str, temp->_max);
 
+    int32_t rh_avg = 0;
+    char rhavg_str[8], rhact_str[8], rhmin_str[8], rhmax_str[8];
     rh_avg = rh->buff / rh->cnt;
     wlab_itostrf(rhavg_str, rh_avg);
     wlab_itostrf(rhact_str, rh->sample_ts_val);
     wlab_itostrf(rhmin_str, rh->_min);
     wlab_itostrf(rhmax_str, rh->_max);
 
-    wifi_net_mac_string(mac_addr);
+    char device_id[13];
+    wlab_get_str_device_id(device_id);
     rc = mqtt_worker_publish_qos1(
-        CONFIG_WLAB_PUB_TOPIC, DHTJsonDataTemplate, mac_addr, temp->sample_ts,
+        CONFIG_WLAB_PUB_TOPIC, DHTJsonDataTemplate, device_id, temp->sample_ts,
         tavg_str, tact_str, tmin_str, tmax_str, temp->_min_ts, temp->_max_ts,
         rhavg_str, rhact_str, rhmin_str, rhmax_str, rh->_min_ts, rh->_max_ts);
     return (rc);
@@ -171,13 +186,13 @@ static int32_t wlab_dht_publish_sample(struct wlab_buffer *temp,
 
 int wlab_authorize(void) {
     int ret = 0;
-    char mac_addr[13];
+    char device_id[13];
 
-    wifi_net_mac_string(mac_addr);
+    wlab_get_str_device_id(device_id);
     ret = mqtt_worker_publish_qos1(
         CONFIG_WLAB_AUTH_TOPIC, AuthTemplate, CONFIG_WLAB_TIMEZONE,
         CONFIG_WLAB_LATITIUDE, CONFIG_WLAB_LONGITUDE, WLAB_TEMP_SERIE,
-        WLAB_HUMIDITY_SERIE, CONFIG_WLAB_NAME, CONFIG_WLAB_DHT_DESC, mac_addr);
+        WLAB_HUMIDITY_SERIE, CONFIG_WLAB_NAME, CONFIG_WLAB_DHT_DESC, device_id);
     return (ret);
 }
 

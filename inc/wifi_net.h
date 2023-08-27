@@ -20,7 +20,7 @@ void wifi_net_init(char *ssid, char *passwd);
  *
  * @param mac_buffer buffer for mac address, will be ended with \0 sign
  */
-void wifi_net_mac_string(char mac_buffer[13]);
+void net_mac_string(char mac_buffer[13]);
 
 /**
  * @brief Register callback to notify network disconnected event.

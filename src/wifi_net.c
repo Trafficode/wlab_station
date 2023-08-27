@@ -48,7 +48,7 @@ void net_on_disconnect_reqister(void (*disco_cb)(int32_t reason)) {
     DiscoCb = disco_cb;
 }
 
-void wifi_net_mac_string(char mac_buffer[13]) {
+void net_mac_string(char mac_buffer[13]) {
     memcpy(mac_buffer, MacHexStr, sizeof(MacHexStr));
 }
 

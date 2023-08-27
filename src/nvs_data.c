@@ -55,24 +55,61 @@ void nvs_data_init(void) {
     }
 }
 
-void nvs_data_net_settings_get(struct net_settings *dst) {
-    __ASSERT((dst != NULL), "null pointer passed");
-    size_t net_settings_len = sizeof(struct net_settings);
+void nvs_data_wifi_config_get(struct wifi_config *dst) {
+    __ASSERT((dst != NULL), "Null pointer passed");
+    size_t wifi_config_len = sizeof(struct wifi_config);
 
-    int ret = nvs_read(&Fs, NVS_ID_NET_SETTINGS, dst, net_settings_len);
+    int ret = nvs_read(&Fs, NVS_ID_WIFI_CONFIG, dst, wifi_config_len);
     if (ret > 0) { /* item was found, show it */
-        LOG_INF("net_settings->wifi_ssid: %s", dst->wifi_ssid);
-        LOG_INF("net_settings->wifi_ssid: %s", dst->wifi_pass);
-        LOG_INF("net_settings->wifi_ssid: %s", dst->mqtt_broker);
-        LOG_INF("net_settings->wifi_ssid: %u", dst->mqtt_port);
+        LOG_INF("wifi_config->wifi_ssid: %s", dst->wifi_ssid);
+        LOG_INF("wifi_config->wifi_ssid: %s", dst->wifi_pass);
     } else { /* item was not found, add it */
-        LOG_WRN("No net_settings found, restore default");
-        memset(dst, 0x00, sizeof(struct net_settings));
-        if (net_settings_len ==
-            nvs_write(&Fs, NVS_ID_NET_SETTINGS, dst, net_settings_len)) {
-            LOG_INF("Network settings cleared");
+        LOG_WRN("No wifi_config found, restore default");
+        memset(dst, 0x00, wifi_config_len);
+        if (wifi_config_len ==
+            nvs_write(&Fs, NVS_ID_WIFI_CONFIG, dst, wifi_config_len)) {
+            LOG_INF("Wifi config cleared");
         } else {
-            LOG_ERR("Network settings clear failed");
+            LOG_ERR("Wifi config clear failed");
+        }
+    }
+}
+
+void nvs_data_mqtt_config_get(struct mqtt_config *dst) {
+    __ASSERT((dst != NULL), "Null pointer passed");
+    size_t mqtt_config_len = sizeof(struct mqtt_config);
+
+    int ret = nvs_read(&Fs, NVS_ID_MQTT_CONFIG, dst, mqtt_config_len);
+    if (ret > 0) {
+        LOG_INF("mqtt_config->mqtt_broker: %s", dst->mqtt_broker);
+        LOG_INF("mqtt_config->mqtt_port: %u", dst->mqtt_port);
+    } else {
+        LOG_WRN("No net_settings found, restore default");
+        memset(dst, 0x00, mqtt_config_len);
+        if (mqtt_config_len ==
+            nvs_write(&Fs, NVS_ID_MQTT_CONFIG, dst, mqtt_config_len)) {
+            LOG_INF("Mqtt config cleared");
+        } else {
+            LOG_ERR("Mqtt config clear failed");
+        }
+    }
+}
+
+void nvs_data_wlab_device_id_get(uint64_t *device_id) {
+    size_t wlab_device_id_len = sizeof(uint64_t);
+
+    int ret =
+        nvs_read(&Fs, NVS_ID_WLAB_DEVICE_ID, device_id, wlab_device_id_len);
+    if (ret > 0) {
+        LOG_DBG("wlab custom device id: %016" PRIX64, *device_id);
+    } else {
+        LOG_WRN("No wlab custom device found, restore default");
+        memset(device_id, 0x00, wlab_device_id_len);
+        if (wlab_device_id_len == nvs_write(&Fs, NVS_ID_WLAB_DEVICE_ID,
+                                            device_id, wlab_device_id_len)) {
+            LOG_INF("Wlab device id clear success");
+        } else {
+            LOG_ERR("Wlab device id clear failed");
         }
     }
 }
