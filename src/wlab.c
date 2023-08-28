@@ -23,6 +23,12 @@
 
 LOG_MODULE_REGISTER(WLAB, LOG_LEVEL_DBG);
 
+#define CONFIG_WLAB_DHT_DESC           ("DHT2X")
+#define CONFIG_WLAB_PUB_TOPIC          ("/wlabdb")
+#define CONFIG_WLAB_AUTH_TOPIC         ("/wlabauth")
+#define CONFIG_WLAB_DEVICE_ID_BUFF_LEN (13)
+#define CONFIG_WLAB_MEASURE_PERIOD     (4) /* secs */
+
 #define WLAB_TEMP_SERIE     (1)
 #define WLAB_HUMIDITY_SERIE (2)
 
@@ -46,11 +52,11 @@ static int wlab_authorize(void);
 static bool wlab_buffer_commit(struct wlab_buffer *buffer, int32_t val,
                                uint32_t ts, uint32_t threshold);
 static void wlab_buffer_init(struct wlab_buffer *buffer);
-static void wlab_itostrf(char *dest, int32_t signed_int);
-static void wlab_get_str_device_id(char dst[13]);
+static void wlab_itostrf(char *dst, int32_t signed_int);
+static void wlab_str_device_id_get(char dst[CONFIG_WLAB_DEVICE_ID_BUFF_LEN]);
 
 const char *AuthTemplate =
-    "{\"timezone\":\"%s\",\"longitude\":%s,\"latitude\":%s,\"serie\":"
+    "{\"timezone\":\"%s\",\"longitude\":%.1f,\"latitude\":%.1f,\"serie\":"
     "{\"Temperature\":%d,\"Humidity\":%d},"
     "\"name\":\"%s\",\"description\":\"%s\", \"uid\":\"%s\"}";
 
@@ -68,6 +74,8 @@ static const struct gpio_dt_spec DHTx =
     GPIO_DT_SPEC_GET(DT_NODELABEL(dht_pin), gpios);
 
 static struct wlab_buffer TempBuffer = {0}, RhBuffer = {0};
+static char DeviceId[13];
+static uint32_t PublishPeriodSecs = 0;
 
 void wlab_init(void) {
     int ret = dht2x_init(&DHTx);
@@ -75,6 +83,7 @@ void wlab_init(void) {
 
     wlab_buffer_init(&TempBuffer);
     wlab_buffer_init(&RhBuffer);
+    nvs_data_wlab_pub_period_get(&PublishPeriodSecs);
 
     uint8_t auth_attempts = 0;
     for (auth_attempts = 0; auth_attempts < 8; auth_attempts++) {
@@ -112,14 +121,14 @@ void wlab_process(int64_t timestamp_secs) {
     }
     LOG_INF("Temp %d, RH %d", temp, rh);
 
-    if ((0x00 == timeinfo.tm_min % CONFIG_WLAB_PUB_PERIOD) &&
+    if ((0x00 == timeinfo.tm_min % PublishPeriodSecs) &&
         (timeinfo.tm_min != last_minutes)) {
         temp_avg = TempBuffer.buff / TempBuffer.cnt;
-        LOG_DBG("temp - min: %d max: %d avg: %d", TempBuffer._min,
+        LOG_INF("temp - min: %d max: %d avg: %d", TempBuffer._min,
                 TempBuffer._max, temp_avg);
 
         rh_avg = RhBuffer.buff / RhBuffer.cnt;
-        LOG_DBG("rh - min: %d max: %d avg: %d", RhBuffer._min, RhBuffer._max,
+        LOG_INF("rh - min: %d max: %d avg: %d", RhBuffer._min, RhBuffer._max,
                 rh_avg);
 
         LOG_DBG("Sample ready to send...");
@@ -142,14 +151,15 @@ process_done:
     return;
 }
 
-static void wlab_get_str_device_id(char dst[13]) {
+static void wlab_str_device_id_get(char dst[CONFIG_WLAB_DEVICE_ID_BUFF_LEN]) {
     uint64_t device_id = 0;
 
     nvs_data_wlab_device_id_get(&device_id);
     if (0 == device_id) {
-        net_mac_string(dst);
+        net_mac_string(DeviceId);
     } else {
-        snprintf(dst, 13, "%012" PRIX64, device_id & 0x0000FFFFFFFFFFFF);
+        snprintf(dst, CONFIG_WLAB_DEVICE_ID_BUFF_LEN, "%012" PRIX64,
+                 device_id & 0x0000FFFFFFFFFFFF);
     }
     LOG_INF("Wlab device id: %s", dst);
 }
@@ -175,10 +185,8 @@ static int wlab_dht_publish_sample(struct wlab_buffer *temp,
     wlab_itostrf(rhmin_str, rh->_min);
     wlab_itostrf(rhmax_str, rh->_max);
 
-    char device_id[13];
-    wlab_get_str_device_id(device_id);
     rc = mqtt_worker_publish_qos1(
-        CONFIG_WLAB_PUB_TOPIC, DHTJsonDataTemplate, device_id, temp->sample_ts,
+        CONFIG_WLAB_PUB_TOPIC, DHTJsonDataTemplate, DeviceId, temp->sample_ts,
         tavg_str, tact_str, tmin_str, tmax_str, temp->_min_ts, temp->_max_ts,
         rhavg_str, rhact_str, rhmin_str, rhmax_str, rh->_min_ts, rh->_max_ts);
     return (rc);
@@ -186,22 +194,26 @@ static int wlab_dht_publish_sample(struct wlab_buffer *temp,
 
 int wlab_authorize(void) {
     int ret = 0;
-    char device_id[13];
+    char station_name[CONFIG_BUFF_MAX_STRING_LEN];
+    struct gps_position position = {0};
 
-    wlab_get_str_device_id(device_id);
+    nvs_data_wlab_name_get(station_name);
+    wlab_str_device_id_get(DeviceId);
+    nvs_data_wlab_gps_position_get(&position);
+
     ret = mqtt_worker_publish_qos1(
-        CONFIG_WLAB_AUTH_TOPIC, AuthTemplate, CONFIG_WLAB_TIMEZONE,
-        CONFIG_WLAB_LATITIUDE, CONFIG_WLAB_LONGITUDE, WLAB_TEMP_SERIE,
-        WLAB_HUMIDITY_SERIE, CONFIG_WLAB_NAME, CONFIG_WLAB_DHT_DESC, device_id);
+        CONFIG_WLAB_AUTH_TOPIC, AuthTemplate, position.timezone,
+        position.latitude, position.longitude, WLAB_TEMP_SERIE,
+        WLAB_HUMIDITY_SERIE, station_name, CONFIG_WLAB_DHT_DESC, DeviceId);
     return (ret);
 }
 
-static void wlab_itostrf(char *dest, int32_t signed_int) {
+static void wlab_itostrf(char *dst, int32_t signed_int) {
     if (0 > signed_int) {
         signed_int = -signed_int;
-        sprintf(dest, "-%d.%d", signed_int / 10, abs(signed_int % 10));
+        sprintf(dst, "-%d.%d", signed_int / 10, abs(signed_int % 10));
     } else {
-        sprintf(dest, "%d.%d", signed_int / 10, abs(signed_int % 10));
+        sprintf(dst, "%d.%d", signed_int / 10, abs(signed_int % 10));
     }
 }
 
@@ -237,7 +249,7 @@ static bool wlab_buffer_commit(struct wlab_buffer *buffer, int32_t val,
 
     if (INT32_MAX == buffer->sample_ts_val) {
         /* Mark buffer timestamp as first sample time */
-        buffer->sample_ts = ts - (ts % (60 * CONFIG_WLAB_PUB_PERIOD));
+        buffer->sample_ts = ts - (ts % (60 * PublishPeriodSecs));
         buffer->sample_ts_val = val;
     }
 

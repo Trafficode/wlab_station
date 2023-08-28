@@ -16,6 +16,7 @@
 #include <zephyr/net/socketutils.h>
 #include <zephyr/sys/reboot.h>
 
+#include "nvs_data.h"
 #include "wdg.h"
 
 LOG_MODULE_REGISTER(MQTT, LOG_LEVEL_DBG);
@@ -92,6 +93,7 @@ K_MSGQ_DEFINE(SubsQueue, sizeof(subs_data_t *), 4, 4);
 K_MEM_SLAB_DEFINE_STATIC(SubsQueueSlab, sizeof(subs_data_t), 4, 4);
 
 static int64_t LastKeepaliveResp = 0;
+static struct mqtt_config MqttConfig = {0};
 
 /**
  * @brief This function has to be delivered by network layer(wifi, modem) to
@@ -150,7 +152,8 @@ failed_done:
     return (ret);
 }
 
-void mqtt_worker_init(const char *hostname, int32_t port,
+void mqtt_worker_init(const char *hostname, int32_t port, uint32_t ping_period,
+                      uint32_t max_ping_no_answer,
                       struct mqtt_subscription_list *subs, subs_cb_t subs_cb) {
     struct mqtt_client *client = &ClientCtx;
 

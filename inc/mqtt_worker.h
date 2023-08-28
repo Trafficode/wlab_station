@@ -25,12 +25,15 @@ typedef void (*subs_cb_t)(char *topic, uint16_t topic_len, char *payload,
  * use api below.
  * @param hostname It can be name of host or string representation of ip addr.
  * @param port Broker port
+ * @param ping_period Ping request period
+ * @param max_ping_no_answer Max time when ping haven't got
  * @param subs Pointer to list of topics to be subscribed, NULL if no topics
  * should be subcribed
  * @param subs_cb Function to handle data incomming to subscribed topics, NULL
  * if not needed.
  */
-void mqtt_worker_init(const char *hostname, int32_t port,
+void mqtt_worker_init(const char *hostname, int32_t port, uint32_t ping_period,
+                      uint32_t max_ping_no_answer,
                       struct mqtt_subscription_list *subs, subs_cb_t subs_cb);
 
 /**

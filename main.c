@@ -35,6 +35,7 @@ static bool ConfigureMode = false;
 int main(void) {
     int ret = 0;
     struct wifi_config wificfg = {};
+    struct mqtt_config mqttcfg = {};
     wdg_init(CONFIG_WDG_TIMEOUT_SEC);
 
     uint32_t ver = sys_kernel_version_get();
@@ -49,16 +50,21 @@ int main(void) {
     __ASSERT((0 == ret), "Config button init failed");
 
     nvs_data_init();
-    nvs_data_wifi_config_get(&wificfg);
-    if (gpio_pin_get_dt(&ConfigButton) || (0 == wificfg.wifi_ssid[0])) {
+
+    if (gpio_pin_get_dt(&ConfigButton)) {
         LOG_WRN("CONFIG MODE ENABLED");
         // ConfigureMode = true;
     }
 
-    if (!ConfigureMode) {
-        wifi_net_init(WIFI_SSID, WIFI_PASS);
-        mqtt_worker_init(CONFIG_WLAB_MQTT_BROKER, CONFIG_WLAB_MQTT_BROKER_PORT,
-                         NULL, NULL);
+    if (ConfigureMode) {
+        ; /* For future use... Start wifi accesspoint */
+    } else {
+        nvs_data_wifi_config_get(&wificfg);
+        wifi_net_init(wificfg.wifi_ssid, wificfg.wifi_pass);
+        nvs_data_mqtt_config_get(&mqttcfg);
+        mqtt_worker_init(mqttcfg.mqtt_broker, mqttcfg.mqtt_port,
+                         mqttcfg.mqtt_ping_period,
+                         mqttcfg.mqtt_max_ping_no_answer, NULL, NULL);
         timestamp_init();
         wlab_init();
     }
@@ -68,12 +74,12 @@ int main(void) {
         wdg_feed();
         gpio_pin_toggle_dt(&InfoLed);
 
-        if (ConfigureMode) {
-            continue;
-        }
-
         if (gpio_pin_get_dt(&ConfigButton)) {
             sys_reboot(SYS_REBOOT_COLD);
+        }
+
+        if (ConfigureMode) {
+            continue;
         }
 
         int64_t ts_now = timestamp_get();

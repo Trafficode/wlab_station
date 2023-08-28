@@ -20,6 +20,6 @@ config MQTT_KEEPALIVE_TIMEOUT_MINS
 	int "The longest time with no keepalive response from server"
 	default 10
 
-config NET_SETTINGS_MAX_STRING_LEN
-	int "Maximum length for wifi_ssid, wifi_pass and mqtt_broker"
+config BUFF_MAX_STRING_LEN
+	int "Maximum length for wifi_ssid, wifi_pass, mqtt_broker or wlab name"
 	default 32
