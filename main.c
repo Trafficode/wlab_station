@@ -11,8 +11,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/reboot.h>
 
-#include "config_wifi.h"
-#include "config_wlab.h"
 #include "dht2x.h"
 #include "mqtt_worker.h"
 #include "nvs_data.h"
@@ -53,7 +51,7 @@ int main(void) {
 
     if (gpio_pin_get_dt(&ConfigButton)) {
         LOG_WRN("CONFIG MODE ENABLED");
-        // ConfigureMode = true;
+        ConfigureMode = true;
     }
 
     if (ConfigureMode) {
@@ -70,18 +68,15 @@ int main(void) {
     }
 
     for (;;) {
-        k_sleep(K_MSEC(100));
         wdg_feed();
         gpio_pin_toggle_dt(&InfoLed);
 
-        if (gpio_pin_get_dt(&ConfigButton)) {
-            sys_reboot(SYS_REBOOT_COLD);
-        }
-
         if (ConfigureMode) {
+            k_sleep(K_MSEC(2000));
             continue;
         }
 
+        k_sleep(K_MSEC(200));
         int64_t ts_now = timestamp_get();
         wlab_process(ts_now);
         timestamp_update();
