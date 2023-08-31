@@ -14,7 +14,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/reboot.h>
 
-#include "config_wlab.h"
 #include "dht2x.h"
 #include "mqtt_worker.h"
 #include "nvs_data.h"
@@ -75,7 +74,7 @@ static const struct gpio_dt_spec DHTx =
 
 static struct wlab_buffer TempBuffer = {0}, RhBuffer = {0};
 static char DeviceId[13];
-static uint32_t PublishPeriodSecs = 0;
+static uint32_t PublishPeriodMins = 0;
 
 void wlab_init(void) {
     int ret = dht2x_init(&DHTx);
@@ -83,7 +82,7 @@ void wlab_init(void) {
 
     wlab_buffer_init(&TempBuffer);
     wlab_buffer_init(&RhBuffer);
-    nvs_data_wlab_pub_period_get(&PublishPeriodSecs);
+    nvs_data_wlab_pub_period_get(&PublishPeriodMins);
 
     uint8_t auth_attempts = 0;
     for (auth_attempts = 0; auth_attempts < 8; auth_attempts++) {
@@ -121,7 +120,7 @@ void wlab_process(int64_t timestamp_secs) {
     }
     LOG_INF("Temp %d, RH %d", temp, rh);
 
-    if ((0x00 == timeinfo.tm_min % PublishPeriodSecs) &&
+    if ((0x00 == timeinfo.tm_min % PublishPeriodMins) &&
         (timeinfo.tm_min != last_minutes)) {
         temp_avg = TempBuffer.buff / TempBuffer.cnt;
         LOG_INF("temp - min: %d max: %d avg: %d", TempBuffer._min,
@@ -249,7 +248,7 @@ static bool wlab_buffer_commit(struct wlab_buffer *buffer, int32_t val,
 
     if (INT32_MAX == buffer->sample_ts_val) {
         /* Mark buffer timestamp as first sample time */
-        buffer->sample_ts = ts - (ts % (60 * PublishPeriodSecs));
+        buffer->sample_ts = ts - (ts % (60 * PublishPeriodMins));
         buffer->sample_ts_val = val;
     }
 

@@ -55,45 +55,75 @@ void nvs_data_init(void) {
     }
 }
 
-void nvs_data_wifi_config_get(struct wifi_config *dst) {
-    __ASSERT((dst != NULL), "Null pointer passed");
+void nvs_data_wifi_config_get(struct wifi_config *wificonf) {
+    __ASSERT((wificonf != NULL), "Null pointer passed");
     size_t wifi_config_len = sizeof(struct wifi_config);
 
-    int ret = nvs_read(&Fs, NVS_ID_WIFI_CONFIG, dst, wifi_config_len);
+    int ret = nvs_read(&Fs, NVS_ID_WIFI_CONFIG, wificonf, wifi_config_len);
     if (ret > 0) { /* item was found, show it */
-        LOG_INF("wifi_config->wifi_ssid: %s", dst->wifi_ssid);
-        LOG_INF("wifi_config->wifi_ssid: %s", dst->wifi_pass);
+        LOG_DBG("wifi_config->wifi_ssid: %s", wificonf->wifi_ssid);
+        LOG_DBG("wifi_config->wifi_ssid: %s", wificonf->wifi_pass);
     } else { /* item was not found, add it */
         LOG_WRN("No wifi_config found, restore default");
-        memset(dst, 0x00, wifi_config_len);
+        memset(wificonf, 0x00, wifi_config_len);
         if (wifi_config_len ==
-            nvs_write(&Fs, NVS_ID_WIFI_CONFIG, dst, wifi_config_len)) {
-            LOG_INF("Wifi config cleared");
+            nvs_write(&Fs, NVS_ID_WIFI_CONFIG, wificonf, wifi_config_len)) {
+            LOG_DBG("Wifi config cleared");
         } else {
             LOG_ERR("Wifi config clear failed");
         }
     }
 }
 
-void nvs_data_mqtt_config_get(struct mqtt_config *dst) {
-    __ASSERT((dst != NULL), "Null pointer passed");
+int nvs_data_wifi_config_set(struct wifi_config *wificonf) {
+    __ASSERT((wificonf != NULL), "Null pointer passed");
+    size_t wifi_config_len = sizeof(struct wifi_config);
+
+    int ret = 0;
+    if (wifi_config_len ==
+        nvs_write(&Fs, NVS_ID_WIFI_CONFIG, wificonf, wifi_config_len)) {
+        LOG_DBG("Wifi config set success");
+    } else {
+        LOG_ERR("Wifi config set failed");
+        ret = -EIO;
+    }
+    return (ret);
+}
+
+void nvs_data_mqtt_config_get(struct mqtt_config *mqttconf) {
+    __ASSERT((mqttconf != NULL), "Null pointer passed");
     size_t mqtt_config_len = sizeof(struct mqtt_config);
 
-    int ret = nvs_read(&Fs, NVS_ID_MQTT_CONFIG, dst, mqtt_config_len);
+    int ret = nvs_read(&Fs, NVS_ID_MQTT_CONFIG, mqttconf, mqtt_config_len);
     if (ret > 0) {
-        LOG_INF("mqtt_config->mqtt_broker: %s", dst->mqtt_broker);
-        LOG_INF("mqtt_config->mqtt_port: %u", dst->mqtt_port);
-        LOG_INF("mqtt_config->mqtt_ping_period: %u", dst->mqtt_ping_period);
+        LOG_DBG("mqtt_config->mqtt_broker: %s", mqttconf->mqtt_broker);
+        LOG_DBG("mqtt_config->mqtt_port: %u", mqttconf->mqtt_port);
+        LOG_DBG("mqtt_config->mqtt_ping_period: %u",
+                mqttconf->mqtt_ping_period);
     } else {
         LOG_WRN("No net_settings found, restore default");
-        memset(dst, 0x00, mqtt_config_len);
+        memset(mqttconf, 0x00, mqtt_config_len);
         if (mqtt_config_len ==
-            nvs_write(&Fs, NVS_ID_MQTT_CONFIG, dst, mqtt_config_len)) {
-            LOG_INF("Mqtt config cleared");
+            nvs_write(&Fs, NVS_ID_MQTT_CONFIG, mqttconf, mqtt_config_len)) {
+            LOG_DBG("Mqtt config cleared");
         } else {
             LOG_ERR("Mqtt config clear failed");
         }
     }
+}
+
+int nvs_data_mqtt_config_set(struct mqtt_config *mqttconf) {
+    __ASSERT((mqttconf != NULL), "Null pointer passed");
+    int ret = 0;
+    size_t mqtt_config_len = sizeof(struct mqtt_config);
+    if (mqtt_config_len ==
+        nvs_write(&Fs, NVS_ID_MQTT_CONFIG, mqttconf, mqtt_config_len)) {
+        LOG_DBG("Mqtt config set success");
+    } else {
+        LOG_ERR("Mqtt config set failed");
+        ret = -EIO;
+    }
+    return (ret);
 }
 
 void nvs_data_wlab_device_id_get(uint64_t *device_id) {
@@ -109,28 +139,59 @@ void nvs_data_wlab_device_id_get(uint64_t *device_id) {
         memset(device_id, 0x00, wlab_device_id_len);
         if (wlab_device_id_len == nvs_write(&Fs, NVS_ID_WLAB_DEVICE_ID,
                                             device_id, wlab_device_id_len)) {
-            LOG_INF("Wlab device id clear success");
+            LOG_DBG("Wlab device id clear success");
         } else {
             LOG_ERR("Wlab device id clear failed");
         }
     }
 }
 
-void nvs_data_wlab_name_get(char *dst) {
-    __ASSERT((dst != NULL), "Null pointer passed");
-    int ret = nvs_read(&Fs, NVS_ID_WLAB_NAME, dst, CONFIG_BUFF_MAX_STRING_LEN);
+int nvs_data_wlab_device_id_set(uint64_t *device_id) {
+    __ASSERT((device_id != NULL), "Null pointer passed");
+    size_t wlab_device_id_len = sizeof(uint64_t);
+
+    int ret = 0;
+    if (wlab_device_id_len ==
+        nvs_write(&Fs, NVS_ID_WLAB_DEVICE_ID, device_id, wlab_device_id_len)) {
+        LOG_DBG("Wlab device id set success");
+    } else {
+        LOG_ERR("Wlab device id set failed");
+        ret = -EIO;
+    }
+    return (ret);
+}
+
+void nvs_data_wlab_name_get(char *wlab_name) {
+    __ASSERT((wlab_name != NULL), "Null pointer passed");
+    int ret =
+        nvs_read(&Fs, NVS_ID_WLAB_NAME, wlab_name, CONFIG_BUFF_MAX_STRING_LEN);
     if (ret > 0) {
-        LOG_DBG("wlab name: <%s>", dst);
+        LOG_DBG("wlab name: <%s>", wlab_name);
     } else {
         LOG_WRN("No wlab name found, restore default");
-        strncpy(dst, "WLAB_STATION", CONFIG_BUFF_MAX_STRING_LEN);
+        strncpy(wlab_name, "WLAB_STATION", CONFIG_BUFF_MAX_STRING_LEN);
         if (CONFIG_BUFF_MAX_STRING_LEN ==
-            nvs_write(&Fs, NVS_ID_WLAB_NAME, dst, CONFIG_BUFF_MAX_STRING_LEN)) {
-            LOG_INF("Wlab name clear success");
+            nvs_write(&Fs, NVS_ID_WLAB_NAME, wlab_name,
+                      CONFIG_BUFF_MAX_STRING_LEN)) {
+            LOG_DBG("Wlab name clear success");
         } else {
             LOG_ERR("Wlab name clear failed");
         }
     }
+}
+
+int nvs_data_wlab_name_set(char *wlab_name) {
+    __ASSERT((wlab_name != NULL), "Null pointer passed");
+    int ret = 0;
+    if (CONFIG_BUFF_MAX_STRING_LEN == nvs_write(&Fs, NVS_ID_WLAB_NAME,
+                                                wlab_name,
+                                                CONFIG_BUFF_MAX_STRING_LEN)) {
+        LOG_DBG("Wlab name set success");
+    } else {
+        LOG_ERR("Wlab name set failed");
+        ret = -EIO;
+    }
+    return (ret);
 }
 
 void nvs_data_wlab_gps_position_get(struct gps_position *gps_pos) {
@@ -140,22 +201,36 @@ void nvs_data_wlab_gps_position_get(struct gps_position *gps_pos) {
     int ret =
         nvs_read(&Fs, NVS_ID_WLAB_GPS_POSITION, gps_pos, wlab_gps_pos_len);
     if (ret > 0) {
-        LOG_INF("wlab gps_pos->timezone: <%s>", gps_pos->timezone);
-        LOG_INF("wlab gps_pos->latitude: <%.1f>", gps_pos->latitude);
-        LOG_INF("wlab gps_pos->longitude: <%.1f>", gps_pos->longitude);
+        LOG_DBG("wlab gps_pos->timezone: <%s>", gps_pos->timezone);
+        LOG_DBG("wlab gps_pos->latitude: <%.1f>", gps_pos->latitude);
+        LOG_DBG("wlab gps_pos->longitude: <%.1f>", gps_pos->longitude);
     } else {
         LOG_WRN("No wlab gps_pos found, restore default");
-        strncpy(gps_pos->timezone, "Europe/Warsaw", CONFIG_BUFF_MAX_STRING_LEN);
+        strncpy(gps_pos->timezone, "Europe/Warsaw", wlab_gps_pos_len);
         gps_pos->latitude = 40.0;
         gps_pos->longitude = 30.0;
-        if (CONFIG_BUFF_MAX_STRING_LEN ==
-            nvs_write(&Fs, NVS_ID_WLAB_GPS_POSITION, gps_pos,
-                      wlab_gps_pos_len)) {
-            LOG_INF("Wlab gps_pos clear success");
+        if (wlab_gps_pos_len == nvs_write(&Fs, NVS_ID_WLAB_GPS_POSITION,
+                                          gps_pos, wlab_gps_pos_len)) {
+            LOG_DBG("Wlab gps_pos clear success");
         } else {
             LOG_ERR("Wlab gps_pos clear failed");
         }
     }
+}
+
+int nvs_data_wlab_gps_position_set(struct gps_position *gps_pos) {
+    __ASSERT((gps_pos != NULL), "Null pointer passed");
+    size_t wlab_gps_pos_len = sizeof(struct gps_position);
+
+    int ret = 0;
+    if (wlab_gps_pos_len ==
+        nvs_write(&Fs, NVS_ID_WLAB_GPS_POSITION, gps_pos, wlab_gps_pos_len)) {
+        LOG_DBG("Wlab gps_pos set success");
+    } else {
+        LOG_ERR("Wlab gps_pos set failed");
+        ret = -EIO;
+    }
+    return (ret);
 }
 
 void nvs_data_wlab_pub_period_get(uint32_t *pub_period) {
@@ -165,17 +240,32 @@ void nvs_data_wlab_pub_period_get(uint32_t *pub_period) {
     int ret =
         nvs_read(&Fs, NVS_ID_WLAB_PUB_PERIOD, pub_period, wlab_pub_period_len);
     if (ret > 0) {
-        LOG_INF("wlab pub period: %u secs", *pub_period);
+        LOG_DBG("wlab pub period: %u secs", *pub_period);
     } else {
         LOG_WRN("No wlab custom device found, restore default");
         memset(pub_period, 0x00, wlab_pub_period_len);
         if (wlab_pub_period_len == nvs_write(&Fs, NVS_ID_WLAB_PUB_PERIOD,
                                              pub_period, wlab_pub_period_len)) {
-            LOG_INF("Wlab device id clear success");
+            LOG_DBG("Wlab device id clear success");
         } else {
             LOG_ERR("Wlab device id clear failed");
         }
     }
+}
+
+int nvs_data_wlab_pub_period_set(uint32_t *pub_period) {
+    __ASSERT((pub_period != NULL), "Null pointer passed");
+    size_t wlab_pub_period_len = sizeof(uint64_t);
+
+    int ret = 0;
+    if (wlab_pub_period_len == nvs_write(&Fs, NVS_ID_WLAB_PUB_PERIOD,
+                                         pub_period, wlab_pub_period_len)) {
+        LOG_DBG("Wlab device id set success");
+    } else {
+        LOG_ERR("Wlab device id set failed");
+        ret = -EIO;
+    }
+    return (ret);
 }
 
 /* ---------------------------------------------------------------------------

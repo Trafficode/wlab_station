@@ -49,9 +49,16 @@ void nvs_data_init(void);
 /**
  * @brief Read wifi settings data, save in dst pointer
  *
- * @param dst Pointer to save settings.
+ * @param wificonf Pointer to save settings.
  */
-void nvs_data_wifi_config_get(struct wifi_config *dst);
+void nvs_data_wifi_config_get(struct wifi_config *wificonf);
+
+/**
+ * @brief Save wifi settings data
+ *
+ * @param wificonf Pointer to save settings.
+ */
+int nvs_data_wifi_config_set(struct wifi_config *wificonf);
 
 /**
  * @brief Read mqtt settings data, save in dst pointer
@@ -61,6 +68,13 @@ void nvs_data_wifi_config_get(struct wifi_config *dst);
 void nvs_data_mqtt_config_get(struct mqtt_config *dst);
 
 /**
+ * @brief Save mqtt settings data.
+ *
+ * @param mqttconf Pointer with data do save
+ */
+int nvs_data_mqtt_config_set(struct mqtt_config *mqttconf);
+
+/**
  * @brief Read wlab device id, if not exists, save UINT64_MAX
  *
  * @param device_id Pointer to save device_id.
@@ -68,12 +82,27 @@ void nvs_data_mqtt_config_get(struct mqtt_config *dst);
 void nvs_data_wlab_device_id_get(uint64_t *device_id);
 
 /**
+ * @brief Save wlab device id.
+ *
+ * @param device_id Pointer with data do save
+ */
+int nvs_data_wlab_device_id_set(uint64_t *device_id);
+
+/**
  * @brief Read wlab name, if not exists, copy WLAB_STATION to dst as default
  * value.
  *
- * @param dst Destination of wlab_name with min size CONFIG_BUFF_MAX_STRING_LEN
+ * @param wlab_name Destination of wlab_name with min size
+ * CONFIG_BUFF_MAX_STRING_LEN
  */
-void nvs_data_wlab_name_get(char *dst);
+void nvs_data_wlab_name_get(char *wlab_name);
+
+/**
+ * @brief Save wlab name.
+ *
+ * @param wlab_name Pointer with data do save
+ */
+int nvs_data_wlab_name_set(char *wlab_name);
 
 /**
  * @brief Read wlab gps position, if not exists, read and save default datata
@@ -83,11 +112,25 @@ void nvs_data_wlab_name_get(char *dst);
 void nvs_data_wlab_gps_position_get(struct gps_position *gps_pos);
 
 /**
+ * @brief Save wlab gps position.
+ *
+ * @param gps_pos Pointer with data do save
+ */
+int nvs_data_wlab_gps_position_set(struct gps_position *gps_pos);
+
+/**
  * @brief Read wlab publish period.
  *
  * @param pub_period Destination of wlab gps position
  */
 void nvs_data_wlab_pub_period_get(uint32_t *pub_period);
+
+/**
+ * @brief Save wlab publish period.
+ *
+ * @param pub_period Pointer with data do save
+ */
+int nvs_data_wlab_pub_period_set(uint32_t *pub_period);
 
 #endif /* NVS_DATA_H_ */
 /* ---------------------------------------------------------------------------

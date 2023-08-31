@@ -106,6 +106,7 @@ void wifi_net_init(char *ssid, char *passwd) {
     }
 
     LOG_INF("Wifi connected");
+    return;
 }
 
 static void reconnect_timer_handler(struct k_timer *dummy) {

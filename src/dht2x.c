@@ -38,8 +38,8 @@ static void gpio_callback(const struct device *dev, struct gpio_callback *cb,
         if (LastElapsed > 100) {
             PulseCnt += 2;
             /* Sometime we are not able to catch first falling edge, if this
-             * situation occure then second elapsed is ~180us. If first edge
-             * catch it should be < 30us */
+             * situation occure then second elapsed is ~180us. First edge
+             * should be < 30us */
         }
     } else if (1 == PulseCnt) {
         PulseCnt++;

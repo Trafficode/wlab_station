@@ -93,7 +93,8 @@ K_MSGQ_DEFINE(SubsQueue, sizeof(subs_data_t *), 4, 4);
 K_MEM_SLAB_DEFINE_STATIC(SubsQueueSlab, sizeof(subs_data_t), 4, 4);
 
 static int64_t LastKeepaliveResp = 0;
-static struct mqtt_config MqttConfig = {0};
+static uint32_t PingPeriodSec = 0;
+static uint32_t MaxPingNoAnsMins = 0;
 
 /**
  * @brief This function has to be delivered by network layer(wifi, modem) to
@@ -105,7 +106,7 @@ extern void net_on_disconnect_reqister(void (*disco_cb)(int reason));
 
 void mqtt_worker_keepalive_test(void) {
     /* wait 2 hours for mqtt connection, samples has to be stored in nvs */
-    int64_t mqtt_alive_timeout = CONFIG_MQTT_KEEPALIVE_TIMEOUT_MINS * 60 * 1000;
+    int64_t mqtt_alive_timeout = MaxPingNoAnsMins * 60 * 1000;
     if (k_uptime_get() > LastKeepaliveResp + mqtt_alive_timeout) {
         sys_reboot(SYS_REBOOT_COLD);
     }
@@ -157,6 +158,8 @@ void mqtt_worker_init(const char *hostname, int32_t port, uint32_t ping_period,
                       struct mqtt_subscription_list *subs, subs_cb_t subs_cb) {
     struct mqtt_client *client = &ClientCtx;
 
+    MaxPingNoAnsMins = max_ping_no_answer;
+    PingPeriodSec = ping_period;
     SubsCb = subs_cb;
     SubsList = subs;
     strncpy(BrokerHostnameStr, hostname, sizeof(BrokerHostnameStr));
@@ -412,7 +415,7 @@ static int input_handle(void) {
     } else {
         LOG_INF("Keepalive...");
         mqtt_live(client);
-        next_alive = uptime_ms + (60 * MSEC_PER_SEC);
+        next_alive = uptime_ms + (PingPeriodSec * MSEC_PER_SEC);
     }
 
     ret = 0; /* success done */
