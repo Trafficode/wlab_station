@@ -206,7 +206,7 @@ void nvs_data_wlab_gps_position_get(struct gps_position *gps_pos) {
         LOG_DBG("wlab gps_pos->longitude: <%.1f>", gps_pos->longitude);
     } else {
         LOG_WRN("No wlab gps_pos found, restore default");
-        strncpy(gps_pos->timezone, "Europe/Warsaw", wlab_gps_pos_len);
+        strncpy(gps_pos->timezone, "Europe/Warsaw", CONFIG_BUFF_MAX_STRING_LEN);
         gps_pos->latitude = 40.0;
         gps_pos->longitude = 30.0;
         if (wlab_gps_pos_len == nvs_write(&Fs, NVS_ID_WLAB_GPS_POSITION,

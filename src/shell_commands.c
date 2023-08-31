@@ -137,7 +137,8 @@ static int cmd_wlab_gps_position(const struct shell *shell, size_t argc,
     }
     struct gps_position gpspos = {0};
     strncpy(gpspos.timezone, argv[1], CONFIG_BUFF_MAX_STRING_LEN);
-
+    gpspos.latitude = strtof(argv[2], NULL);
+    gpspos.longitude = strtof(argv[3], NULL);
     if (0 == nvs_data_wlab_gps_position_set(&gpspos)) {
         shell_fprintf(shell, SHELL_NORMAL, "latitude: %.2f\n", gpspos.latitude);
         shell_fprintf(shell, SHELL_NORMAL, "longitude: %.2f\n",
